@@ -96,7 +96,9 @@ pub struct BoardState{
 
 
     castle_rights: u8,
-    half_move_clock: u8
+    half_move_clock: u8,
+    is_in_check: Option<bool>,
+    legal_moves: Option<ChessMoveList>
 
 }
 
@@ -194,7 +196,13 @@ impl ChessMoveList{
     }
 }
 
+impl Clone for ChessMoveList{
+    fn clone(&self) -> Self {
+        Self { index: self.index.clone(), chess_moves: self.chess_moves.clone() }
+    }
+}
 
+impl Copy for ChessMoveList{}
 
 
 impl BoardState{
@@ -307,7 +315,9 @@ impl BoardState{
             white_to_move: to_move,
             en_passant_square: en_passant_square, 
             castle_rights: castle_rights,
-            half_move_clock: 0 }
+            half_move_clock: 0,
+            is_in_check: None,
+            legal_moves: None}
     }
 
     pub fn get_board(&self) -> [[i8; 8]; 8]{
@@ -555,7 +565,7 @@ impl BoardState{
         return true;
     }
 
-    fn legal_castle_moves(&self, chess_moves:&mut ChessMoveList){
+    fn legal_castle_moves(&mut self, chess_moves:&mut ChessMoveList){
         let back_rank = if self.white_to_move {0} else {56};
         if self.is_in_check(self.white_to_move) {
             return;
@@ -589,7 +599,7 @@ impl BoardState{
         }
     }
 
-    fn pseudo_legal_king_moves(&self, chess_moves:&mut ChessMoveList, origin: u8){
+    fn pseudo_legal_king_moves(&mut self, chess_moves:&mut ChessMoveList, origin: u8){
         for direction in [1, -1, 8, -8, 7, -7, 9, -9]{
             let target = origin as i8+direction;
             if target >= 64 || target < 0{
@@ -616,7 +626,7 @@ impl BoardState{
         self.legal_castle_moves(chess_moves);
     }
 
-    fn pseudo_legal_moves(&self) -> ChessMoveList{
+    fn pseudo_legal_moves(&mut self) -> ChessMoveList{
         let mut chess_moves = ChessMoveList::new();
         for i in 0..64{
             let i = i;
@@ -638,18 +648,25 @@ impl BoardState{
     }
     //Missing "can not castle out of check rule"
     //?Implement in legal_moves() or pseudo_legal_king_moves() ?????
-    pub fn legal_moves(&self) -> ChessMoveList{
+    pub fn legal_moves_gen(&mut self) -> ChessMoveList{
         let mut moves = self.pseudo_legal_moves();
         for i in 0..218{
             if moves.chess_moves[i].move_data == 0 {
                 continue;
             }
-            let new_board_state = self.perform_move(moves.chess_moves[i]);
+            let mut new_board_state = self.perform_move(moves.chess_moves[i]);
             if new_board_state.is_in_check(self.white_to_move){
                 moves.chess_moves[i].move_data = 0;
             }
         }
         return moves;
+    }
+
+    pub fn legal_moves(&mut self) -> ChessMoveList{
+        if self.legal_moves.is_none(){
+            self.legal_moves = Some(self.legal_moves_gen());
+        }
+        return self.legal_moves.unwrap();
     }
     
     //Blindly perform a move, and updates the board state. Does not check for legality
@@ -660,7 +677,8 @@ impl BoardState{
         let target = chess_move.target();
 
         let mut new_board_state = BoardState::clone(&self);
-
+        new_board_state.legal_moves = None;
+        new_board_state.is_in_check = None;
 
         match flag {
             NO_FLAG => {
@@ -866,11 +884,14 @@ impl BoardState{
         return 10000;
     }
 
-    fn is_in_check(&self, color:bool) -> bool{
-        return self.is_attacked(self.king_pos(color) as u8, !color);
+    fn is_in_check(&mut self, color:bool) -> bool{
+        if self.is_in_check.is_none(){
+            self.is_in_check = Some(self.is_attacked(self.king_pos(color) as u8, !color));
+        }
+        return self.is_in_check.unwrap();
     }
 
-    pub fn perform_move_api(&self, mut origin:u8, mut target: u8, promote_to: u8) -> Option<BoardState>{
+    pub fn perform_move_api(&mut self, mut origin:u8, mut target: u8, promote_to: u8) -> Option<BoardState>{
 
         //if pawn move:
             //check for en passant
@@ -950,13 +971,13 @@ impl BoardState{
         return None;
     }
 
-    pub fn legal_move_count(&self) -> usize{
+    pub fn legal_move_count(&mut self) -> usize{
         let moves = self.legal_moves();
         return moves.size();
 
     }
 
-    pub fn game_state(&self) -> GameState{
+    pub fn game_state(&mut self) -> GameState{
         if self.legal_move_count() == 0{
             if self.white_to_move && self.is_in_check(self.white_to_move){
                 return GameState::Black;
@@ -969,7 +990,7 @@ impl BoardState{
         return GameState::Playing;
     }
 
-    pub fn has_ended(&self) -> bool {
+    pub fn has_ended(&mut self) -> bool {
         return self.game_state() != GameState::Playing;
     }
 
@@ -1013,7 +1034,9 @@ impl Clone for BoardState{
             white_to_move: self.white_to_move, 
             en_passant_square: self.en_passant_square, 
             castle_rights: self.castle_rights, 
-            half_move_clock: self.half_move_clock }
+            half_move_clock: self.half_move_clock,
+            is_in_check: self.is_in_check,
+            legal_moves: self.legal_moves }
     }
 }
 

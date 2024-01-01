@@ -18,8 +18,8 @@ mod tests {
 
         for i in 0..2{
             let fen = fens[i];
-            let start_pos = BoardState::new_from_fen(fen);
-            assert_eq!(start_pos.legal_move_count(), expected[i], "failed for {fen}");
+            let mut pos = BoardState::new_from_fen(fen);
+            assert_eq!(pos.legal_move_count(), expected[i], "failed for {fen}");
         }
     }
 }

@@ -14,7 +14,7 @@ impl Bot for Bot1{
         Self{}
     }
 
-    fn get_move(&self, board_state:BoardState) -> ChessMove{
+    fn get_move(&self, mut board_state:BoardState) -> ChessMove{
         let moves = board_state.legal_moves();
         let mut picked_move:ChessMove = ChessMove::new_empty();
         let mut rng = rand::thread_rng();

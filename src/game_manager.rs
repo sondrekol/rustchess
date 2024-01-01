@@ -1,4 +1,4 @@
-use std::{thread::{self, JoinHandle}, ptr::null};
+use std::{thread::{self, JoinHandle}, ptr::null, time::SystemTime};
 
 use self::{board2::{BoardState, ChessMove}, bot1::Bot1, bot::Bot, bot2::Bot2};
 
@@ -12,7 +12,8 @@ pub struct GameManager{
     board_state: BoardState,
     turn: bool,
     bot: Bot2,
-    bot_thread: Option<JoinHandle<ChessMove>>
+    bot_thread: Option<JoinHandle<ChessMove>>,
+    bot_start_time: SystemTime
 
 }
 
@@ -25,6 +26,7 @@ impl GameManager{
             board_state: BoardState::new_from_fen(fen),
             bot: Bot2::new(),
             bot_thread: None,
+            bot_start_time: SystemTime::now()
         }
     }
 
@@ -43,6 +45,7 @@ impl GameManager{
             //start the bot if it is not running
             if self.bot_thread.is_none(){
 
+                self.bot_start_time = SystemTime::now();
                 let board_state = self.board_state;
                 let bot = self.bot;
 
@@ -60,6 +63,7 @@ impl GameManager{
                 if handle.is_finished(){
                     let chess_move = handle.join().unwrap();
                     println!("Bot finished with move: origin: {}, target: {}, flag:{}", chess_move.origin(), chess_move.target(), chess_move.flag());
+                    println!("time elapsed: {}", self.bot_start_time.elapsed().unwrap().as_millis());
                     self.board_state = self.board_state.perform_move(chess_move);
                     self.turn = !self.turn;
                     self.bot_thread = None;

@@ -16,15 +16,14 @@ impl Bot for Bot2{
         Self{}
     }
 
-    fn get_move(&self, board_state:BoardState) -> ChessMove{
-        return self.search(&board_state, 6, f64::MIN, f64::MAX).1;
+    fn get_move(&self, mut board_state:BoardState) -> ChessMove{
+        return self.search(&mut board_state, 6, f64::MIN, f64::MAX).1;
     }
 }
 
 
 impl Bot2 {
-
-    fn evaluate(&self, board_state:&BoardState) -> f64{
+    fn evaluate(&self, board_state:&mut BoardState) -> f64{
         let game_state = board_state.game_state();
         match game_state{
             GameState::Black => {return f64::MIN}
@@ -37,7 +36,7 @@ impl Bot2 {
         return board_state.piece_count() + rng.gen_range(-0.001..0.001);
     }
 
-    fn search(&self, board_state:&BoardState, depth:usize, mut alpha:f64, mut beta:f64) -> (f64, ChessMove){
+    fn search(&self, board_state:&mut BoardState, depth:usize, mut alpha:f64, mut beta:f64) -> (f64, ChessMove){
         if depth == 0 || board_state.has_ended(){
             return (self.evaluate(board_state), ChessMove::new_empty())
         }
@@ -53,7 +52,7 @@ impl Bot2 {
             if chess_move.is_null() {
                 continue;
             }
-            let result = self.search(&board_state.perform_move(chess_move), depth-1, alpha, beta);
+            let result = self.search(&mut board_state.perform_move(chess_move), depth-1, alpha, beta);
             if result.0 >= max{
                 max = result.0;
                 max_move = chess_move;

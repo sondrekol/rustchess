@@ -17,7 +17,7 @@ impl Bot for Bot2{
     }
 
     fn get_move(&self, board_state:BoardState) -> ChessMove{
-        return self.search(&board_state, 6, f64::MIN, f64::MAX).1;
+        return self.search(&board_state, 5, f64::MIN, f64::MAX).1;
     }
 }
 

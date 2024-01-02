@@ -17,12 +17,14 @@ impl Bot for Bot2{
     }
 
     fn get_move(&self, mut board_state:BoardState) -> ChessMove{
-        return self.search(&mut board_state, 6, f64::MIN, f64::MAX).1;
+        return self.search(&mut board_state, 4, f64::MIN, f64::MAX).1;
     }
 }
 
 
 impl Bot2 {
+
+    
     fn evaluate(&self, board_state:&mut BoardState) -> f64{
         let game_state = board_state.game_state();
         match game_state{
@@ -32,11 +34,22 @@ impl Bot2 {
             GameState::Playing => {}
         }
         let mut rng = rand::thread_rng();
+        let mut eval = 0_f64;
 
-        return board_state.piece_count() + rng.gen_range(-0.001..0.001);
+        eval += board_state.piece_count();
+
+        eval += rng.gen_range(-0.001..0.001);
+
+        let mut move_count = (board_state.legal_move_count() as f64)/60.0;
+        if move_count > 1.0{
+            move_count = 1.0;
+        }
+        move_count *= if board_state.white_to_move() {1.0} else {-1.0};
+        eval += move_count;
+        return eval;
     }
 
-    fn search(&self, board_state:&mut BoardState, depth:usize, mut alpha:f64, mut beta:f64) -> (f64, ChessMove){
+    fn search(&self, mut board_state:&mut BoardState, depth:usize, mut alpha:f64, mut beta:f64) -> (f64, ChessMove){
         if depth == 0 || board_state.has_ended(){
             return (self.evaluate(board_state), ChessMove::new_empty())
         }
@@ -52,7 +65,19 @@ impl Bot2 {
             if chess_move.is_null() {
                 continue;
             }
-            let result = self.search(&mut board_state.perform_move(chess_move), depth-1, alpha, beta);
+            //Do the move
+            let captured_piece = board_state.piece(chess_move.target() as usize);
+            let castle_rights = board_state.castle_rights();
+            board_state.perform_move_mutable(chess_move);
+
+
+            let result = self.search(&mut board_state, depth-1, alpha, beta);
+
+            //undo the move
+            board_state.undo_move_mutable(chess_move);
+            board_state.set_piece(chess_move.target() as usize, captured_piece);
+            board_state.set_castle_rights(castle_rights);
+
             if result.0 >= max{
                 max = result.0;
                 max_move = chess_move;

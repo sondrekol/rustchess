@@ -7,6 +7,7 @@ mod board2tests;
 mod bot1;
 mod bot;
 mod bot2;
+mod bot2bench;
 pub struct GameManager{
     player_color: bool,
     board_state: BoardState,

@@ -142,6 +142,7 @@ impl App {
         if self.game_manager.update(){
 
             self.board_graphic_state = self.game_manager.get_board();
+            self.piece_in_hand = 0;
         }
     }
 

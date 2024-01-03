@@ -1,29 +1,76 @@
 use crate::game_manager::board2::{BoardState, ChessMove};
 use crate::game_manager::bot::Bot;
+use graphics::color::WHITE;
 use rand::Rng;
 
-use super::board2::GameState;
+use super::board2::{GameState, DOUBLE_PAWN_MOVE, W_CASTLE_KING, W_CASTLE_QUEEN, B_CASTLE_KING, B_CASTLE_QUEEN, WHITE_EN_PASSANT, BLACK_EN_PASSANT, PROMOTE_TO_KNIGHT, PROMOTE_TO_BISHOP, PROMOTE_TO_ROOK, PROMOTE_TO_QUEEN, NO_FLAG};
 
 
 
 pub struct Bot2{
-
+    search_depth: i64
 }
 
 
 impl Bot for Bot2{
     fn new() -> Self{
-        Self{}
+        Self{
+            search_depth: 4
+        }
     }
 
     fn get_move(&self, mut board_state:BoardState) -> ChessMove{
-        return self.search(&mut board_state, 4, f64::MIN, f64::MAX).1;
+        return self.search(&mut board_state, self.search_depth, f64::MIN, f64::MAX).1;
     }
 }
 
 
 impl Bot2 {
 
+    fn promising_move(&self, board_state:&mut BoardState, chess_move: &ChessMove) -> f64{
+        let mut promising_level = 0.0;
+
+        let origin_value = board_state.piece_value(chess_move.origin());
+        let target_value = board_state.piece_value(chess_move.target());
+
+        let color_value = if origin_value < 0.0 {-1.0} else {1.0}; //Note that origin square is never 0
+
+        match chess_move.flag(){
+            NO_FLAG => {
+                promising_level += (-target_value)/origin_value;
+            }
+            DOUBLE_PAWN_MOVE => {
+                promising_level += 1.0*color_value;
+            }
+            W_CASTLE_KING | W_CASTLE_QUEEN => {
+                promising_level += 3.0;
+            }
+            B_CASTLE_KING | B_CASTLE_QUEEN => {
+                promising_level += -3.0;
+            }
+            WHITE_EN_PASSANT => {
+                promising_level += 2.0;
+            }
+            BLACK_EN_PASSANT => {
+                promising_level += -2.0;
+            }
+            PROMOTE_TO_KNIGHT => {
+                promising_level += 3.0*color_value -target_value;
+            }
+            PROMOTE_TO_BISHOP => {
+                promising_level += 3.0*color_value -target_value;
+            }
+            PROMOTE_TO_ROOK => {
+                promising_level += 5.0*color_value -target_value;
+            }
+            PROMOTE_TO_QUEEN => {
+                promising_level += 9.0*color_value -target_value;
+            }
+            _ => {println!("INVALID MOVE FLAG")}
+        }
+
+        return promising_level;
+    }
     
     fn evaluate(&self, board_state:&mut BoardState) -> f64{
         let game_state = board_state.game_state();
@@ -41,26 +88,57 @@ impl Bot2 {
         eval += rng.gen_range(-0.001..0.001);
 
         let mut move_count = (board_state.legal_move_count() as f64)/60.0;
-        if move_count > 1.0{
-            move_count = 1.0;
+        if move_count > 0.5{
+            move_count = 0.5;
         }
         move_count *= if board_state.white_to_move() {1.0} else {-1.0};
         eval += move_count;
         return eval;
     }
 
-    fn search(&self, mut board_state:&mut BoardState, depth:usize, mut alpha:f64, mut beta:f64) -> (f64, ChessMove){
-        if depth == 0 || board_state.has_ended(){
+    fn search(&self, mut board_state:&mut BoardState, depth:i64, mut alpha:f64, mut beta:f64) -> (f64, ChessMove){
+
+        if board_state.has_ended(){
+            if depth == self.search_depth {
+                println!("Bot: no legal moves");
+            }
             return (self.evaluate(board_state), ChessMove::new_empty())
         }
+        let mut moves = board_state.legal_moves().moves_vec();
 
-        let moves = board_state.legal_moves().moves_vec();
+        if depth <= 0 {
+            //Only search captures
+            moves = moves.into_iter().filter(|a| board_state.piece_value(a.target()) != 0.0).collect();
+            
+            if moves.len() == 0 || depth <= -2{
+                return (self.evaluate(board_state), ChessMove::new_empty());
+            }
+
+            //return (self.evaluate(board_state), ChessMove::new_empty());
+        }
+
+
+        
         let mut min:f64 = f64::MAX;
         let mut max:f64 = f64::MIN;
 
         let mut min_move:ChessMove = *moves.get(0).unwrap();
         let mut max_move:ChessMove = *moves.get(0).unwrap();
 
+        if board_state.white_to_move() {
+            moves.sort_by(|a, b| 
+                self.promising_move(board_state, a)
+                .partial_cmp(&self.promising_move(board_state, b))
+                .unwrap().reverse()
+                )
+        } 
+        else {
+            moves.sort_by(|a, b| 
+                self.promising_move(board_state, a)
+                .partial_cmp(&self.promising_move(board_state, b))
+                .unwrap()
+            )
+        };
         for chess_move in moves{
             if chess_move.is_null() {
                 continue;
@@ -111,7 +189,9 @@ impl Bot2 {
 
 impl Clone for Bot2{
     fn clone(&self) -> Self {
-        Self {  }
+        Self {  
+            search_depth: self.search_depth
+        }
     }
 }
 impl Copy for Bot2{}

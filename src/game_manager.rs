@@ -8,6 +8,7 @@ mod bot1;
 mod bot;
 mod bot2;
 mod bot2bench;
+mod move_gen;
 pub struct GameManager{
     player_color: bool,
     board_state: BoardState,
@@ -62,7 +63,11 @@ impl GameManager{
             //check if bot has finished, and make the move
             if let Some(handle) = self.bot_thread.take() {
                 if handle.is_finished(){
-                    let chess_move = handle.join().unwrap();
+                    let bot_result = handle.join();
+                    if bot_result.is_err(){
+                        println!("Bot error")
+                    }
+                    let chess_move = bot_result.unwrap();
                     println!("Bot finished with move: origin: {}, target: {}, flag:{}", chess_move.origin(), chess_move.target(), chess_move.flag());
                     println!("time elapsed: {}", self.bot_start_time.elapsed().unwrap().as_millis());
                     self.board_state = self.board_state.perform_move(chess_move);

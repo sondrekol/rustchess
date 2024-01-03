@@ -39,22 +39,22 @@ const NO_EN_PASSANT_SQUARE:u8 = 0x80;
 
 
 //Move flags:
-const PROMOTE_TO_KNIGHT:u8 = 0b0000;
-const PROMOTE_TO_BISHOP:u8 = 0b0001;
-const PROMOTE_TO_ROOK:u8 = 0b0010;
-const PROMOTE_TO_QUEEN:u8 = 0b0011;
+pub const PROMOTE_TO_KNIGHT:u8 = 0b0000;
+pub const PROMOTE_TO_BISHOP:u8 = 0b0001;
+pub const PROMOTE_TO_ROOK:u8 = 0b0010;
+pub const PROMOTE_TO_QUEEN:u8 = 0b0011;
 
-const W_CASTLE_KING:u8 = 0b0100;
-const W_CASTLE_QUEEN:u8 = 0b0101;
-const B_CASTLE_KING:u8 = 0b0110;
-const B_CASTLE_QUEEN:u8 = 0b0111;
+pub const W_CASTLE_KING:u8 = 0b0100;
+pub const W_CASTLE_QUEEN:u8 = 0b0101;
+pub const B_CASTLE_KING:u8 = 0b0110;
+pub const B_CASTLE_QUEEN:u8 = 0b0111;
 
-const WHITE_EN_PASSANT:u8 = 0b1000;
-const BLACK_EN_PASSANT:u8 = 0b1001;
+pub const WHITE_EN_PASSANT:u8 = 0b1000;
+pub const BLACK_EN_PASSANT:u8 = 0b1001;
 
-const DOUBLE_PAWN_MOVE:u8 = 0b1010;
+pub const DOUBLE_PAWN_MOVE:u8 = 0b1010;
 
-const NO_FLAG:u8 = 0b1111;
+pub const NO_FLAG:u8 = 0b1111;
 
 
 pub static VERTICAL_DISTANCE:[[u8; 64];64] = {
@@ -199,6 +199,10 @@ impl ChessMoveList{
         self.index += 1;
     }
 
+    pub fn add_no_alloc(&mut self, origin:u8, target:u8, flag:u8){
+        self.chess_moves[self.index as usize].move_data = origin as u16 | ((target as u16) << 6) | ((flag as u16) << 12);
+    }
+
     pub fn pop(&mut self) -> ChessMove{
         let result = self.chess_moves[self.index as usize];
         self.index -= 1;
@@ -226,6 +230,13 @@ impl ChessMoveList{
             }
         }
         return moves;
+    }
+
+    pub fn reset(&mut self) {
+        for i in 0..218{
+            self.chess_moves[i].move_data = 0;
+        }
+        self.index = 0;
     }
 }
 
@@ -1238,7 +1249,31 @@ impl BoardState{
         return piece_count;
     }
 
+    pub fn piece_value(&self, square: u8) -> f64{
+        let mut value:f64 = 0.0;
+        match self.pieces[square as usize] & PIECE_TYPE_MASK{
+            PIECE_PAWN => {value = 1.0}
+            PIECE_KNIGHT => {value = 3.0}
+            PIECE_BISHOP => {value = 3.0}
+            PIECE_ROOK => {value = 5.0}
+            PIECE_QUEEN => {value = 9.0}
+            PIECE_KING => {value = 1.0}
+            0 => {value = 0.0}
+            _ => {println!("INVALID PIECE AT {}, PIECE: {}", square, self.pieces[square as usize])}
+        }
+        if self.pieces[square as usize] | PIECE_COLOR_MASK == PIECE_BLACK {
+            value *= -1.0;
+        }
+        return value;
+    }
+
+    pub fn pieces(&self) -> &[u8; 64]{
+        return &self.pieces;
+    }
+
     pub fn white_to_move(&self) -> bool{self.white_to_move}
+    pub fn en_passant_square(&self) -> u8{self.en_passant_square}
+    pub fn casstle_rights(&self) -> u8{self.castle_rights}
 }
 
 impl Clone for BoardState{

@@ -2,6 +2,8 @@
 
 #[cfg(test)]
 mod tests{
+    use std::time::SystemTime;
+
     use crate::game_manager::{bot2::Bot2, bot::Bot, board2::BoardState};
 
     #[test]
@@ -14,7 +16,9 @@ mod tests{
                 "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - "];
         let mut bot2 = Bot2::new();
         for fen in fens{
+                let start_time = SystemTime::now();
                 bot2.get_move(BoardState::new_from_fen(fen));
-        }
+                println!("bot found move in: {}", start_time.elapsed().unwrap().as_millis());
+       }
     }
 }

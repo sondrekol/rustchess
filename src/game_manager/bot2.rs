@@ -20,7 +20,7 @@ pub struct Bot2{
 impl Bot for Bot2{
     fn new() -> Self{
         Self{
-            search_depth: 6,
+            search_depth: 5,
             max_depth: 15,
             num_pos: 0,
             move_generator: MoveGen::new()
@@ -148,20 +148,12 @@ impl Bot2 {
             if captured_piece == 134 || captured_piece == 70 {
                 println!("{}",self.num_pos);
             }
-
-            let castle_rights = board_state.castle_rights();
-            board_state.perform_move_mutable(chess_move);
-
             
 
             
 
-            let result = self.search(&mut board_state, depth-1+extension, alpha, beta, true_depth +1);
+            let result = self.search(&mut board_state.perform_move(chess_move), depth-1+extension, alpha, beta, true_depth +1);
 
-            //undo the move
-            board_state.undo_move_mutable(chess_move);
-            board_state.set_piece(chess_move.target() as usize, captured_piece);
-            board_state.set_castle_rights(castle_rights);
 
             if result.0 >= max{
                 max = result.0;

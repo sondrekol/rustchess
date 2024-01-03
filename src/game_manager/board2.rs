@@ -199,7 +199,10 @@ impl PartialEq for ChessMove {
 
 impl ChessMoveList{
     pub fn new() -> Self{
-        Self { index: 0, chess_moves: [ChessMove{move_data: 0}; 218] }
+        Self { 
+            index: 0, 
+            chess_moves: [ChessMove{move_data: 0}; 218]
+        }
     }
 
     pub fn add(&mut self, chess_move:ChessMove){
@@ -823,9 +826,9 @@ impl BoardState{
         return new_board_state;
     }
     pub fn perform_move_mutable(&mut self, chess_move:ChessMove){
-        self.move_history.push(chess_move);
-        self.piece_history.push(self.pieces);
-        
+        //self.move_history.push(chess_move);
+        //self.piece_history.push(self.pieces);
+
         let flag = chess_move.flag();
         let origin = chess_move.origin();
         let target = chess_move.target();
@@ -942,8 +945,8 @@ impl BoardState{
     }
 
     pub fn undo_move_mutable(&mut self, chess_move:ChessMove){
-        self.move_history.pop();
-        self.piece_history.pop();
+        //self.move_history.pop();
+        //self.piece_history.pop();
         let flag = chess_move.flag();
         let origin = chess_move.origin();
         let target = chess_move.target();

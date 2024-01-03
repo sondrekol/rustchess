@@ -41,6 +41,11 @@ pub const WEST_OF:[u64; 8] = [ //Indexed by file
     FILE_A | FILE_B | FILE_C | FILE_D | FILE_E | FILE_F | FILE_G | FILE_H,
 ];
 
+pub const CASTLE_W_K_LINE:u64 = 0x0000000000000060;
+pub const CASTLE_W_Q_LINE:u64 = 0x000000000000000E;
+pub const CASTLE_B_K_LINE:u64 = 0x6000000000000000;
+pub const CASTLE_B_Q_LINE:u64 = 0x0E00000000000000;
+
 
 //ROOK
 const fn rook_attack_map_for_square(square: i32) -> u64{
@@ -51,16 +56,16 @@ const fn rook_attack_map_for_square(square: i32) -> u64{
         let south = square-8*i;
         let east = square+1*i;
         let west = square-1*i;
-        if north >= 0 && north < 64 && north%8 == square%8{
+        if north >= 0 && north < 64 && north%8 == square%8{// ! potential for overflow??
             map |= 1 << north;
         }
-        if south >= 0 && south < 64 && south%8 == square%8{
+        if south >= 0 && south < 64 && south%8 == square%8{// ! potential for overflow??
             map |= 1 << south;
         }
-        if east >= 0 && east < 64 && east/8 == square%8{
+        if east >= 0 && east < 64 && east/8 == square/8{// ! potential for overflow??
             map |= 1 << east;
         }
-        if west >= 0 && west < 64 && west/8 == square%8{
+        if west >= 0 && west < 64 && west/8 == square/8{// ! potential for overflow??
             map |= 1 << west;
         }
         i+=1;
@@ -82,8 +87,30 @@ pub struct RookMoves{
 
 }
 impl RookMoves{
-    pub fn mov_map(pos:usize, blockers:u64) -> u64{
-        return 0; //TODO
+    pub fn mov_map(pos:usize, blockers:u64) -> u64{// !temp until magics
+        let pos = pos as i32;
+        let mut map:u64 = 0;
+
+        let north = 8;
+        let south = -8;
+        let east = 1;
+        let west = -1;
+        for direction in [north, south, west, east]{
+
+            for i in 1..8{
+                let new_square = pos+direction*i;
+                if new_square < 0 || new_square >= 64{
+                    break;
+                }
+                if pos%8 == new_square%8 || pos/8 == new_square/8{
+                    map |= 1 << new_square;
+                }
+                if blockers & (1 << new_square) != 0{
+                    break;
+                }
+            }
+        }
+        return map;
     }
 }
 
@@ -113,6 +140,7 @@ const fn bishop_attack_map_for_square(square:i32) -> u64{
     map
 }
 
+
 pub const BISHOP_ATTACK_MAPS:[u64; 64] = {
     let mut bishop_attack_map:[u64; 64] = [0; 64];
     let mut i = 0;
@@ -127,8 +155,30 @@ pub struct BishopMoves{
 
 }
 impl BishopMoves{
-    pub fn mov_map(pos:usize, blockers:u64) -> u64{
-        return 0; //TODO
+    pub fn mov_map(pos:usize, blockers:u64) -> u64{// !TEMP UNTIL MAGICS
+        let pos = pos as i32;
+        let mut map:u64 = 0;
+
+        let northeast = 9;
+        let northewest = 7;
+        let southeast = -7;
+        let southwest = -9;
+        for direction in [northeast, northewest, southeast, southwest]{
+            for i in 1..8{
+                let new_square = pos + direction*i;
+                if new_square < 0 || new_square >= 64{
+                    break;
+                }
+                if (new_square%8 - pos%8).abs() == (new_square/8 - pos/8).abs(){
+                    map |= 1 << new_square;
+                }
+                if blockers & (1 << new_square) != 0{
+                    break;
+                }
+            }
+
+        }
+        return map;
     }
 }
 
@@ -140,7 +190,7 @@ const fn king_move(king_pos: i32, offset: i32) -> u64{
     }
 
     //check for wraparound
-    if (king_pos%8 -king_pos+offset%8).abs() > 1 || (king_pos/8 - king_pos+offset/8).abs() > 1{
+    if (king_pos%8 - (king_pos+offset)%8).abs() > 1 || (king_pos/8 - (king_pos+offset)/8).abs() > 1{
         return 0;
     }
     return 1 << king_pos + offset;
@@ -172,7 +222,7 @@ const fn pawn_capture(pawn_pos: i32, offset: i32) -> u64{
     }
 
     //check for wraparound
-    if (pawn_pos%8 -pawn_pos+offset%8).abs() != 1 || (pawn_pos/8 -pawn_pos+offset/8).abs() != 1{
+    if (pawn_pos%8 -(pawn_pos+offset)%8).abs() != 1 || (pawn_pos/8 -(pawn_pos+offset)/8).abs() != 1{
         return 0;
     }
 
@@ -201,7 +251,7 @@ const fn knight_move(knight_pos:i32, offset: i32) -> u64{
     }
 
     //check for wraparound
-    if (knight_pos%8 -knight_pos+offset%8).abs() + (knight_pos/8 -knight_pos+offset/8).abs() != 3{
+    if (knight_pos%8 -(knight_pos+offset)%8).abs() + (knight_pos/8 -(knight_pos+offset)/8).abs() != 3{
         return 0;
     }
 

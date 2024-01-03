@@ -1,3 +1,5 @@
+
+
 use super::board2::{BoardState, ChessMoveList};
 
 mod bit_boards;
@@ -47,7 +49,7 @@ const NO_FLAG:u8 = 0b1111;
 
 
 
-struct MoveGen{
+pub struct MoveGen{
     //Board state
     piece_bb: [[u64; 6];2],
     to_move: usize,
@@ -67,9 +69,11 @@ struct MoveGen{
     //helpers
     color_mask: [u64; 2], //indexed by color, return a bitboard of pieces with said color
     checkers: u64, //bitboard containing the current checkers
+    check_line: u64, //line bitboard of checkline if king is checked by sliding piece
     pinned_pieces: u64, //bitboard containing all pinned pieces
     pinned_pieces_indicies: [usize; 8], //list of indicies of pinned pieces
-    pin_lines: [u64; 8] //8 line bitboards corresponding to pinned pieces
+    pin_lines: [u64; 8], //8 line bitboards corresponding to pinned pieces
+    rank_2th: [u64; 2] //bit board for each color of corresponding 7th rank
 }
 
 impl MoveGen{
@@ -91,9 +95,11 @@ impl MoveGen{
 
             color_mask: [0; 2],
             checkers: 0,
+            check_line: 0,
             pinned_pieces: 0,
             pinned_pieces_indicies: [64; 8], //value 64 represents no pinned piece
-            pin_lines: [0; 8]
+            pin_lines: [0; 8],
+            rank_2th: [bit_boards::RANK_7, bit_boards::RANK_2]
         }
     }
 
@@ -152,11 +158,13 @@ impl MoveGen{
         //TODO: move clock
 
         self.checkers = 0;
+        self.check_line = 0;
         self.pinned_pieces = 0;
         self.pinned_pieces_indicies = [64; 8];
         self.pin_lines = [0; 8];
         
     }
+
 
     //does not add moves that move into mask (mask=1 represents a square that should no be move to)
     //otherwise adds moves defined by target bb
@@ -179,12 +187,64 @@ impl MoveGen{
         }
     }
 
-    fn legal_pawn_moves_colored<Usize>(&mut self) {
+    //generates legal pawn moves for pawns on 2nd rank
+    fn legal_pawn_on_2nd(&mut self, mut pawns: u64, mask:u64){
+        while pawns != 0 {
+            let pawn = bit_boards::pop_LSB(&mut pawns);
+            let normal_captures = bit_boards::PAWN_CAPTURES[self.to_move][pawn] & self.color_mask[self.other];
+            let normal_move = if self.to_move == WHITE {pawn+8} else {pawn-8};
+            let normal_moves = normal_captures | ((1 << normal_move) & !(self.color_mask[self.to_move] | self.color_mask[self.other]));
 
+            self.generate_moves_target_masked(pawn, normal_moves, 0b1111, mask);
+            if (1 << normal_move) & (self.color_mask[self.to_move] | self.color_mask[self.other]) == 0{
+                let double_move = (1 << (if self.to_move == WHITE {pawn+16} else {pawn-16})) & !(self.color_mask[self.to_move] | self.color_mask[self.other]);
+                self.generate_moves_target_masked(pawn, double_move, 0b1010, mask);
+            }
+        }
+    }
+
+    //generates legal pawn moves for pawns on 7th rank
+    fn legal_pawn_on_7th(&mut self, mut pawns: u64, mask:u64){
+        while pawns != 0 {
+            let pawn = bit_boards::pop_LSB(&mut pawns);
+            let normal_captures = bit_boards::PAWN_CAPTURES[self.to_move][pawn] & self.color_mask[self.other];
+            let normal_move = if self.to_move == WHITE {pawn+8} else {pawn-8};
+            let normal_moves = normal_captures | ((1 << normal_move) & !(self.color_mask[self.to_move] | self.color_mask[self.other]));
+            self.generate_moves_target_masked(pawn, normal_moves, 0b0000, mask);
+            self.generate_moves_target_masked(pawn, normal_moves, 0b0001, mask);
+            self.generate_moves_target_masked(pawn, normal_moves, 0b0010, mask);
+            self.generate_moves_target_masked(pawn, normal_moves, 0b0011, mask);
+        }
+    }
+
+    //generates legal pawn moves for pawns neither on 7th nor 2nd rank
+    fn legal_pawn_mid_board(&mut self, mut pawns: u64, mask:u64) {
+        while pawns != 0 {
+            let pawn = bit_boards::pop_LSB(&mut pawns);
+            let capture_targets = bit_boards::PAWN_CAPTURES[self.to_move][pawn];
+            let normal_captures = capture_targets & self.color_mask[self.other];
+            let normal_move = if self.to_move == WHITE {pawn+8} else {pawn-8};
+            let normal_moves = normal_captures | ((1 << normal_move) & !(self.color_mask[self.to_move] | self.color_mask[self.other]));
+            self.generate_moves_target_masked(pawn, normal_moves, 0b1111, mask);
+
+
+            if self.en_passant_possible{
+                let en_passant_captures = capture_targets & (1 << self.en_passant_square) & mask;
+                //TODO: guarded en_passant add
+            }
+            let normal_move = if self.to_move == WHITE {pawn+8} else {pawn-8};
+        }
+    }
+
+    fn legal_pawn_moves(&mut self, mut pawns: u64, mask:u64){
+        let rank_2nd_pawns = pawns & self.rank_2th[self.to_move];
+        let rank_7th_pawns = pawns & self.rank_2th[self.other];
+        self.legal_pawn_on_2nd(rank_2nd_pawns, mask);
+        self.legal_pawn_on_7th(rank_7th_pawns, mask);
+        self.legal_pawn_mid_board(pawns & !(rank_2nd_pawns | rank_7th_pawns), mask);
     }
 
     fn legal_knight_moves(&mut self, mut knights: u64, mask:u64){
-        let mut knights = self.piece_bb[self.to_move][KNIGHT];
         while knights != 0 {
 
             let knight = bit_boards::pop_LSB(&mut knights);
@@ -202,6 +262,25 @@ impl MoveGen{
         let moves_bb = bit_boards::KING_MOVES[king_pos] & !(self.color_mask[self.to_move]);
 
         self.generate_moves_for_king(king_pos, moves_bb, 0b1111);
+    }
+
+    fn legal_evading_king_moves(&mut self){
+        //TODO: find index of closes checkline square
+        let king_pos = u64::trailing_zeros(self.piece_bb[self.to_move][KING]) as usize;
+        let moves_bb = bit_boards::KING_MOVES[king_pos] & !(self.color_mask[self.to_move]);
+
+        let towards_check = moves_bb & self.check_line; //should return the one and only move that will move towards the checking piece 
+        let offset = u64::trailing_zeros(towards_check) as i32 - king_pos as i32; //return the offset of towards_check move
+        let opposite_offset = king_pos as i32 - offset; //uses the offset to calculate position of away_from_check
+
+        let away_from_check:u64 = 1 << opposite_offset;
+        self.generate_moves_for_king(king_pos, moves_bb & !away_from_check, 0b1111);
+
+
+        /*NOTE: 
+        no check for validity of away_from_check as a king move,
+        if it is not valid, then no such move exists and the map has no effect on the moves
+        */
     }
 
     //Calculate all pseudo legal rook moves, on squares provided by "rooks"
@@ -248,15 +327,43 @@ impl MoveGen{
         }
     }
 
-    //Check deniers - moves that prevent check, but does not move the king (check blockers, and check capturing)
-    fn legal_check_deniers(&mut self){
-        //TODO
-    }
-
     //generate legal castle_moves
     //this function assumes that "to move side" is not in check
     fn legal_castles(&mut self){
-        //TODO
+        //check for castle rights -> then neither king or rook has moved
+        //check for pieces blocking the castle
+        //check for attacked squares on king_path
+        if self.to_move == WHITE{
+            if self.castle_w_k {
+                if (self.color_mask[BLACK] | self.color_mask[WHITE]) & bit_boards::CASTLE_W_K_LINE == 0 {
+                    if self.attackers(5) == 0 && self.attackers(6) == 0{
+                        self.legal_moves.add_no_alloc(0, 0, 0b0100);
+                    }
+                }
+            }
+            if self.castle_w_q {
+                if (self.color_mask[BLACK] | self.color_mask[WHITE]) & bit_boards::CASTLE_W_Q_LINE == 0 {
+                    if self.attackers(2) == 0 && self.attackers(3) == 0{
+                        self.legal_moves.add_no_alloc(0, 0, 0b0101);
+                    }
+                }
+            }
+        }else{
+            if self.castle_b_k {
+                if (self.color_mask[BLACK] | self.color_mask[WHITE]) & bit_boards::CASTLE_B_K_LINE == 0 {
+                    if self.attackers(61) == 0 && self.attackers(62) == 0{
+                        self.legal_moves.add_no_alloc(0, 0, 0b0110);
+                    }
+                }
+            }
+            if self.castle_b_q {
+                if (self.color_mask[BLACK] | self.color_mask[WHITE]) & bit_boards::CASTLE_B_Q_LINE == 0 {
+                    if self.attackers(59) == 0 && self.attackers(58) == 0{
+                        self.legal_moves.add_no_alloc(0, 0, 0b0111);
+                    }
+                }
+            }
+        }
     }
 
     //generate all legal moves except for castles
@@ -265,22 +372,30 @@ impl MoveGen{
         //pseudo legal +
         //for king: does not move into check
         //for pinned pieces: does not move out of pin line
-    fn legal_moves(&mut self){
-        //generate for non pinned rook, bishop, queen, knight:
-        self.legal_knight_moves(self.piece_bb[self.to_move][KNIGHT] & !self.pinned_pieces, 0);
-        self.legal_bishop_moves(self.piece_bb[self.to_move][BISHOP] & !self.pinned_pieces, 0);
-        self.legal_rook_moves(self.piece_bb[self.to_move][ROOK] & !self.pinned_pieces, 0);
-        self.legal_queen_moves(self.piece_bb[self.to_move][QUEEN] & !self.pinned_pieces, 0);
+    fn legal_moves(&mut self, mask:u64){
+        //generate normal moves for king
 
-        //generate normal move, double move, normal captures for non pinned pawns
-        //TODO
+        //generate for non pinned rook, bishop, queen, knight:
+        self.legal_knight_moves(self.piece_bb[self.to_move][KNIGHT] & !self.pinned_pieces, mask);
+        self.legal_bishop_moves(self.piece_bb[self.to_move][BISHOP] & !self.pinned_pieces, mask);
+        self.legal_rook_moves(self.piece_bb[self.to_move][ROOK] & !self.pinned_pieces, mask);
+        self.legal_queen_moves(self.piece_bb[self.to_move][QUEEN] & !self.pinned_pieces, mask);
+        self.legal_pawn_moves(self.piece_bb[self.to_move][PAWN] & !self.pinned_pieces, mask);
+
         //generate moves for pinned pieces
         for i in 0..8{
-            
+            if self.pinned_pieces_indicies[i] != 64{
+                let pinned_piece_map = 1 << self.pinned_pieces_indicies[i];
+                self.legal_knight_moves(self.piece_bb[self.to_move][KNIGHT] & pinned_piece_map, !self.pin_lines[i] | mask);
+                self.legal_bishop_moves(self.piece_bb[self.to_move][BISHOP] & pinned_piece_map, !self.pin_lines[i] | mask);
+                self.legal_rook_moves(self.piece_bb[self.to_move][ROOK] & pinned_piece_map, !self.pin_lines[i] | mask);
+                self.legal_queen_moves(self.piece_bb[self.to_move][QUEEN] & pinned_piece_map, !self.pin_lines[i] | mask);
+                self.legal_pawn_moves(self.piece_bb[self.to_move][PAWN] & pinned_piece_map, !self.pin_lines[i] | mask);
+            }
         }
     }
 
-    fn update_pinned_pieces(&mut self){
+    fn update_pinned_pieces_and_check_line(&mut self){
         let king_pos = u64::trailing_zeros(self.piece_bb[self.to_move][KING]) as usize;
 
         //generate move bb, note that these "moves" pass right trough the kings own pieces
@@ -313,6 +428,10 @@ impl MoveGen{
                     pinned_piece_index+=1;
 
                 }
+                //if there is no piece between king and attack, then king is checked trough this line
+                else if u64::count_ones(own_pieces_on_path) == 0{
+                    self.check_line = rookmoves;
+                }
             }
         }
         for bishopmoves in [northeast, northwest, southeast, southwest]{
@@ -325,6 +444,10 @@ impl MoveGen{
                     self.pin_lines[pinned_piece_index] = bishopmoves;
                     pinned_piece_index+=1;
 
+                }
+                //if there is no piece between king and attack, then king is checked trough this line
+                else if u64::count_ones(own_pieces_on_path) == 0{
+                    self.check_line = bishopmoves;
                 }
             }
         }
@@ -351,10 +474,13 @@ impl MoveGen{
         let knight_attackers = knight_moves_bb & self.piece_bb[self.other][KNIGHT];
 
         //Count pawn attackers
-        let pawn_moves_bb = bit_boards::PAWN_CAPTURES[self.other][pos] & !(self.color_mask[self.to_move]);
-        let pawn_attackers = pawn_moves_bb & self.piece_bb[self.other][KNIGHT];
+        let pawn_moves_bb = bit_boards::PAWN_CAPTURES[self.to_move][pos] & !(self.color_mask[self.to_move]);
+        let pawn_attackers = pawn_moves_bb & self.piece_bb[self.other][PAWN];
         
-        return rook_attackers | bishop_attackers | knight_attackers | pawn_attackers;
+        //Count king attackeers
+        let king_attack_bb = bit_boards::KING_MOVES[pos] & !(self.color_mask[self.to_move]);
+        let king_attacker = king_attack_bb & self.piece_bb[self.other][KING];
+        return rook_attackers | bishop_attackers | knight_attackers | pawn_attackers | king_attacker;
     }
 
     //update checkers bitboard, return number of checkers
@@ -370,19 +496,30 @@ impl MoveGen{
         self.legal_moves.reset();
         self.setup_state(board_state);
 
-        self.update_pinned_pieces();
+        let king_pos = u64::trailing_zeros(self.piece_bb[self.to_move][KING]) as usize;
+        if king_pos >= 64 {
+            panic!("king position is invalid");
+        }
+
+        self.update_pinned_pieces_and_check_line();
 
         match self.num_checkers() {
             2 => {
-                self.legal_king_moves(); //If double check, only generate legal king moves
+                self.legal_evading_king_moves(); //If double check, only generate legal king moves
             }
             1 => {
-                self.legal_king_moves();
-                self.legal_check_deniers(); //Generate only moves blocking check
+                if self.check_line == 0 {
+                    self.legal_king_moves();
+                    self.legal_moves(!self.checkers); //happens if knight check, in which case non king moves must capture the knight
+                }else{
+                    self.legal_evading_king_moves();
+                    self.legal_moves(!self.check_line); //Generate only moves blocking check, or capturing checking piece
+                }
             }
             0 => {
                 self.legal_castles();
-                self.legal_moves();
+                self.legal_king_moves();
+                self.legal_moves(0);
             }
             _ => {
                 panic!("More than 2 checkers");
@@ -407,3 +544,35 @@ impl MoveGen{
 }
 
 
+
+impl Clone for MoveGen{
+    fn clone(&self) -> Self {
+        Self {
+            piece_bb: [[0; 6]; 2],
+            to_move: 2,
+            other: 2,
+            en_passant_square: 0,
+            en_passant_possible: false,
+            castle_w_k: false,
+            castle_w_q: false,
+            castle_b_k: false,
+            castle_b_q: false,
+
+            legal_moves: ChessMoveList::new(), //move lists should only be instansiated here
+            check_moves: ChessMoveList::new(), //move lists should only be instansiated here
+            capture_moves: ChessMoveList::new(), //move lists should only be instansiated here
+
+            color_mask: [0; 2],
+            checkers: 0,
+            check_line: 0,
+            pinned_pieces: 0,
+            pinned_pieces_indicies: [64; 8], //value 64 represents no pinned piece
+            pin_lines: [0; 8],
+            rank_2th: [bit_boards::RANK_7, bit_boards::RANK_2]
+        }
+    }
+}
+
+impl Copy for MoveGen{
+
+}

@@ -6,6 +6,8 @@
 
 //Piece codes
 
+use super::move_gen::MoveGen;
+
 
 
 const PIECE_PAWN: u8 = 0b00000001;
@@ -131,7 +133,8 @@ pub struct BoardState{
     is_in_check: Option<bool>,
     legal_moves: Option<ChessMoveList>,
     white_king: usize,
-    black_king: usize
+    black_king: usize,
+    move_history: Vec<ChessMove>
 
 }
 
@@ -201,11 +204,12 @@ impl ChessMoveList{
 
     pub fn add_no_alloc(&mut self, origin:u8, target:u8, flag:u8){
         self.chess_moves[self.index as usize].move_data = origin as u16 | ((target as u16) << 6) | ((flag as u16) << 12);
+        self.index+= 1;
     }
 
     pub fn pop(&mut self) -> ChessMove{
-        let result = self.chess_moves[self.index as usize];
         self.index -= 1;
+        let result = self.chess_moves[self.index as usize];
         return result;
     }
 
@@ -223,8 +227,8 @@ impl ChessMoveList{
         return &self.chess_moves;
     }
     pub fn moves_vec(&self) -> Vec<ChessMove>{
-        let mut moves = Vec::<ChessMove>::new();
-        for i in 0..218{
+        let mut moves = Vec::<ChessMove>::with_capacity(218);
+        for i in 0..self.index as usize{
             if self.chess_moves[i].move_data != 0{
                 moves.push(self.chess_moves[i]);
             }
@@ -373,7 +377,8 @@ impl BoardState{
             is_in_check: None,
             legal_moves: None,
             white_king: white_king,
-            black_king: black_king 
+            black_king: black_king,
+            move_history: Vec::<ChessMove>::new()
         }
     }
 
@@ -812,7 +817,7 @@ impl BoardState{
         return new_board_state;
     }
     pub fn perform_move_mutable(&mut self, chess_move:ChessMove){
-
+        self.move_history.push(chess_move);
         let flag = chess_move.flag();
         let origin = chess_move.origin();
         let target = chess_move.target();
@@ -929,7 +934,7 @@ impl BoardState{
     }
 
     pub fn undo_move_mutable(&mut self, chess_move:ChessMove){
-
+        self.move_history.pop();
         let flag = chess_move.flag();
         let origin = chess_move.origin();
         let target = chess_move.target();
@@ -1093,6 +1098,29 @@ impl BoardState{
                     }
                 }
             }
+        }
+
+        //check king
+        for direction in [1, -1, 7, 8, 9, -7, -8, -9]{
+            let target = square as i8+direction;
+            if target >= 64 || target < 0{
+                continue;
+            }
+            let target = target as u8;
+
+            if HORIZONTAL_DISTANCE[square as usize][target as usize] > 1 || VERTICAL_DISTANCE[square as usize][target as usize] > 1{
+                continue;
+            }
+
+            if self.same_color(square, target){
+                continue;
+            }
+            else {
+                if self.pieces[target as usize] == attacker_color | PIECE_KING{
+                    return true;
+                }
+            }
+            
         }
 
 
@@ -1288,11 +1316,11 @@ impl Clone for BoardState{
             is_in_check: self.is_in_check,
             legal_moves: self.legal_moves,
             white_king: self.white_king,
-            black_king: self.black_king 
+            black_king: self.black_king,
+            move_history: Vec::<ChessMove>::new()
         }
     }
 }
 
-impl Copy for BoardState{}
 
 

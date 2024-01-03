@@ -5,7 +5,7 @@
 mod tests {
     use std::str::Bytes;
 
-    use crate::game_manager::board2::BoardState;
+    use crate::game_manager::board2::{BoardState, ChessMove};
     use crate::game_manager::move_gen::MoveGen;
 
     fn string_square(square:u8) -> String{
@@ -112,10 +112,55 @@ mod tests {
 
     #[test]
     fn print_history(){
-        let history:[u16; 5] = [63213, 62212, 63259, 61708, 61724];
+        let history:[u16; 8] = [63244, 64057, 42504, 43251, 42894, 63418, 63363, 61701];
         for mov in history{
-            println!("move: origin: {}, target: {}, flag: {}", string_square((mov&0b111111)as u8), string_square(((mov >> 6)&0b111111)as u8), ((mov >> 12)&0b111111)as u8);
+            println!("move: origin: {}, target: {}, flag: {}", string_square((mov&0b111111)as u8), string_square(((mov >> 6)&0b111111)as u8), ((mov >> 12)&0b001111)as u8);
         }
+
+        let mut board_state:BoardState = BoardState::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        let mut move_gen = MoveGen::new();
+        for mov in history{
+            let moves = move_gen.gen_moves_legal(&board_state).moves_vec();
+            board_state.perform_move_mutable(ChessMove::new_exact(mov));
+        }
+    }
+
+
+    #[test]
+    fn undo_move_test(){
+        let fens = [
+            "8/1PP1PK2/P2Bn3/3R4/1N3p2/1p5p/7Q/1nr2k2 w - - 0 1",
+            "3b4/3Bn1BP/3N4/3P2k1/2K5/P6p/2P3Np/2q3r1 w - - 0 1",
+            "k6q/4pp2/PP6/2bp1B2/Pr6/8/2P3K1/N1B1N3 w - - 0 1",
+            "1B6/1P3N2/8/3b2bP/B2K4/P4ppp/2pk3P/1Q6 w - - 0 1",
+            "2q5/b6p/PRp2P1K/8/p1P4P/2N1B2P/7P/7k w - - 0 1",
+            "8/NPKp4/r2B2P1/5p2/1P6/pkn2qr1/2p1P3/8 w - - 0 1",
+            "8/1Rp2Pq1/5BPP/Kp1P4/3R4/4p3/3Pr1P1/3k4 w - - 0 1",
+            "2Q2K2/1p2PB2/NpP3rP/2Pp3b/2p5/1kP1P1B1/p3R2p/2b3rq w - - 0 1",
+            "1N1b4/R1p2bPp/Kn3p2/3kP3/3P4/2Q1BP2/pP1PP1q1/4R1nr w - - 0 1",
+            "3b4/3PP1pb/P2pK1B1/Nr3p2/2PpPP1N/1R3Q1r/P4p2/k3n3 w - - 0 1",
+            "bBk5/p1Pn1N1P/P2p4/1B3Pr1/n4Rpp/1K3p2/1b1Pp3/4q1r1 w - - 0 1", 
+            "1Nk2q2/Kpp2pPr/1P1bP2P/3PP3/PnRPnpp1/2rQ3p/bNpp1R2/4BB2 w - - 0 1",
+            "1Nq4r/3PPpRp/r1P1nK1p/2P1p1PQ/2pp1B1p/N1Rb2pB/2PP1kP1/b4n2 w - - 0 1"
+            ];
         
+        for fen in fens{
+            let a = BoardState::new_from_fen(fen);
+            let mut b = BoardState::new_from_fen(fen);
+            let mut move_gen = MoveGen::new();
+            for chess_move in move_gen.gen_moves_legal(&b).moves_vec(){
+
+                let captured_piece = b.piece(chess_move.target() as usize);
+                let castle_rights = b.castle_rights();
+
+                b.perform_move_mutable(chess_move);
+                b.undo_move_mutable(chess_move);
+
+                b.set_piece(chess_move.target() as usize, captured_piece);
+                b.set_castle_rights(castle_rights);
+
+                assert!(BoardState::equal_game_state(&a, &b));
+            }
+        }
     }
 }

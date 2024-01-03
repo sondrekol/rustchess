@@ -134,7 +134,8 @@ pub struct BoardState{
     legal_moves: Option<ChessMoveList>,
     white_king: usize,
     black_king: usize,
-    move_history: Vec<ChessMove>
+    move_history: Vec<ChessMove>,
+    piece_history: Vec<[u8; 64]>
 
 }
 
@@ -148,6 +149,10 @@ impl ChessMove{
      */
     pub fn new_empty() -> Self{
         Self { move_data: 0 }
+    }
+
+    pub fn new_exact(move_data:u16) -> Self{
+        Self { move_data: move_data }
     }
 
     pub fn from_indices(flags: u8, origin:u8, target: u8) -> Self{
@@ -378,7 +383,8 @@ impl BoardState{
             legal_moves: None,
             white_king: white_king,
             black_king: black_king,
-            move_history: Vec::<ChessMove>::new()
+            move_history: Vec::<ChessMove>::new(),
+            piece_history: Vec::<[u8; 64]>::new()
         }
     }
 
@@ -818,6 +824,8 @@ impl BoardState{
     }
     pub fn perform_move_mutable(&mut self, chess_move:ChessMove){
         self.move_history.push(chess_move);
+        self.piece_history.push(self.pieces);
+        
         let flag = chess_move.flag();
         let origin = chess_move.origin();
         let target = chess_move.target();
@@ -935,6 +943,7 @@ impl BoardState{
 
     pub fn undo_move_mutable(&mut self, chess_move:ChessMove){
         self.move_history.pop();
+        self.piece_history.pop();
         let flag = chess_move.flag();
         let origin = chess_move.origin();
         let target = chess_move.target();
@@ -1317,7 +1326,8 @@ impl Clone for BoardState{
             legal_moves: self.legal_moves,
             white_king: self.white_king,
             black_king: self.black_king,
-            move_history: Vec::<ChessMove>::new()
+            move_history: Vec::<ChessMove>::new(),
+            piece_history: Vec::<[u8; 64]>::new()
         }
     }
 }

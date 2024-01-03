@@ -273,7 +273,10 @@ impl MoveGen{
         let offset = u64::trailing_zeros(towards_check) as i32 - king_pos as i32; //return the offset of towards_check move
         let opposite_offset = king_pos as i32 - offset; //uses the offset to calculate position of away_from_check
 
-        let away_from_check:u64 = 1 << opposite_offset;
+        
+        let away_from_check:u64 = if opposite_offset >= 0 && opposite_offset < 64 {
+                                        1 << opposite_offset
+                                    }else {0};
         self.generate_moves_for_king(king_pos, moves_bb & !away_from_check, 0b1111);
 
 
@@ -498,6 +501,7 @@ impl MoveGen{
 
         let king_pos = u64::trailing_zeros(self.piece_bb[self.to_move][KING]) as usize;
         if king_pos >= 64 {
+            println!("s");
             panic!("king position is invalid");
         }
 
@@ -540,6 +544,24 @@ impl MoveGen{
         self.check_moves.reset();
         self.setup_state(board_state);
         return self.capture_moves;
+    }
+
+    pub fn piece_count(&self) -> f64{
+        return 
+         (u64::count_ones(self.piece_bb[WHITE][PAWN]) as f64)*1.0
+        +(u64::count_ones(self.piece_bb[WHITE][KNIGHT]) as f64)*3.0
+        +(u64::count_ones(self.piece_bb[WHITE][BISHOP]) as f64)*3.5
+        +(u64::count_ones(self.piece_bb[WHITE][ROOK]) as f64)*5.0
+        +(u64::count_ones(self.piece_bb[WHITE][QUEEN]) as f64)*9.0
+        -(u64::count_ones(self.piece_bb[BLACK][PAWN]) as f64)*1.0
+        -(u64::count_ones(self.piece_bb[BLACK][KNIGHT]) as f64)*3.0
+        -(u64::count_ones(self.piece_bb[BLACK][BISHOP]) as f64)*3.5
+        -(u64::count_ones(self.piece_bb[BLACK][ROOK]) as f64)*5.0
+        -(u64::count_ones(self.piece_bb[BLACK][QUEEN]) as f64)*9.0;
+        
+    }
+    pub fn update_board(&mut self, board_state:&BoardState){
+        self.setup_state(board_state);
     }
 }
 

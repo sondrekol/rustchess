@@ -20,8 +20,8 @@ pub struct Bot2{
 impl Bot for Bot2{
     fn new() -> Self{
         Self{
-            search_depth: 7,
-            max_depth: 20,
+            search_depth: 6,
+            max_depth: 15,
             num_pos: 0,
             move_generator: MoveGen::new()
         }
@@ -85,22 +85,16 @@ impl Bot2 {
     }
     
     fn evaluate(&mut self, board_state:&mut BoardState) -> f64{
+        self.move_generator.update_board(board_state);
+
         self.num_pos += 1;
         let mut rng = rand::thread_rng();
         let mut eval:f64 = 0.0;
 
-        eval += board_state.piece_count();
 
         eval += rng.gen_range(-0.001..0.001);
 
-        
-
-        let mut move_count = (self.move_generator.gen_moves_legal(board_state)).size() as f64/60.0;
-        if move_count > 0.5{
-            move_count = 0.5;
-        }
-        move_count *= if board_state.white_to_move() {0.2} else {-0.2};
-        eval += move_count;
+        eval+=self.move_generator.piece_count();
         return eval;
     }
 
@@ -142,14 +136,27 @@ impl Bot2 {
             )
         };
         for chess_move in moves{
+
+            //Maybe maybe not
+            let mut extension = 0;
+            if board_state.piece_value(chess_move.target()) != 0.0 {
+                extension = 0;
+            }
+
             //Do the move
             let captured_piece = board_state.piece(chess_move.target() as usize);
+            if captured_piece == 134 || captured_piece == 70 {
+                println!("{}",self.num_pos);
+            }
 
             let castle_rights = board_state.castle_rights();
             board_state.perform_move_mutable(chess_move);
 
+            
 
-            let result = self.search(&mut board_state, depth-1, alpha, beta, true_depth +1);
+            
+
+            let result = self.search(&mut board_state, depth-1+extension, alpha, beta, true_depth +1);
 
             //undo the move
             board_state.undo_move_mutable(chess_move);

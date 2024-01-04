@@ -1,6 +1,6 @@
 
 
-use super::board2::{BoardState, ChessMoveList};
+use super::board2::{BoardState, ChessMoveList, ChessMove, GameState};
 
 mod bit_boards;
 mod bit_boards_tests;
@@ -48,8 +48,14 @@ const DOUBLE_PAWN_MOVE:u8 = 0b1010;
 const NO_FLAG:u8 = 0b1111;
 
 
+/*
+    NOTE:
+    the state of the position should not be mutated,
 
-pub struct MoveGen{
+
+
+*/
+pub struct BitBoardState{
     //Board state
     piece_bb: [[u64; 6];2],
     to_move: usize,
@@ -63,8 +69,7 @@ pub struct MoveGen{
 
     //move lists
     legal_moves: ChessMoveList,
-    check_moves: ChessMoveList,
-    capture_moves: ChessMoveList,
+    legal_moves_calculated: bool,
 
     //helpers
     color_mask: [u64; 2], //indexed by color, return a bitboard of pieces with said color
@@ -76,7 +81,7 @@ pub struct MoveGen{
     rank_2th: [u64; 2] //bit board for each color of corresponding 7th rank
 }
 
-impl MoveGen{
+impl BitBoardState{
     pub fn new() -> Self{
         Self {
             piece_bb: [[0; 6]; 2],
@@ -90,8 +95,7 @@ impl MoveGen{
             castle_b_q: false,
 
             legal_moves: ChessMoveList::new(), //move lists should only be instansiated here
-            check_moves: ChessMoveList::new(), //move lists should only be instansiated here
-            capture_moves: ChessMoveList::new(), //move lists should only be instansiated here
+            legal_moves_calculated: false,
 
             color_mask: [0; 2],
             checkers: 0,
@@ -187,6 +191,45 @@ impl MoveGen{
         }
     }
 
+    fn generate_en_passant(&mut self, pawn:usize, en_passant_square:u64){
+        if en_passant_square == 0 {
+            return;
+        }
+
+        //check if results in check
+        let king_pos = u64::trailing_zeros(self.piece_bb[self.to_move][KING]) as usize;
+        let captured_by_enpassant = if self.to_move == WHITE {en_passant_square >> 8} else {en_passant_square << 8};
+        if pawn/8 == king_pos/8 {//if pawn and king are on same file
+            let rook_moves_bb = bit_boards::RookMoves::mov_map(
+                king_pos, 
+                (self.color_mask[WHITE] | self.color_mask[BLACK]) & !((1 << captured_by_enpassant)|(1 << pawn)));
+            let king_rook_bb:u64;
+            if pawn%8 < king_pos%8 {//never equal, as it would imply pawn and king occupy the same square
+                king_rook_bb = rook_moves_bb & bit_boards::west(king_pos);
+
+            }else{
+                king_rook_bb = rook_moves_bb & bit_boards::east(king_pos);
+
+            }
+            if king_rook_bb & (self.piece_bb[self.other][ROOK] | self.piece_bb[self.other][QUEEN]) != 0{
+                return; //This en passant move results in check
+            }
+        }
+
+        if self.to_move == WHITE{
+            self.legal_moves.add_no_alloc(
+                pawn as u8, 
+                u64::trailing_zeros(en_passant_square) as u8, 
+                WHITE_EN_PASSANT)
+        }else{
+            self.legal_moves.add_no_alloc(
+                pawn as u8, 
+                u64::trailing_zeros(en_passant_square) as u8, 
+                BLACK_EN_PASSANT)
+        }
+        
+    }
+
     //generates legal pawn moves for pawns on 2nd rank
     fn legal_pawn_on_2nd(&mut self, mut pawns: u64, mask:u64){
         while pawns != 0 {
@@ -229,8 +272,8 @@ impl MoveGen{
 
 
             if self.en_passant_possible{
-                let en_passant_captures = capture_targets & (1 << self.en_passant_square) & mask;
-                //TODO: guarded en_passant add
+                let en_passant_capture = capture_targets & (1 << self.en_passant_square) & !mask;
+                self.generate_en_passant(pawn, en_passant_capture);
             }
             let normal_move = if self.to_move == WHITE {pawn+8} else {pawn-8};
         }
@@ -265,7 +308,6 @@ impl MoveGen{
     }
 
     fn legal_evading_king_moves(&mut self){
-        //TODO: find index of closes checkline square
         let king_pos = u64::trailing_zeros(self.piece_bb[self.to_move][KING]) as usize;
         let moves_bb = bit_boards::KING_MOVES[king_pos] & !(self.color_mask[self.to_move]);
 
@@ -495,9 +537,12 @@ impl MoveGen{
         return u64::count_ones(self.checkers) as usize;
     }
 
-    pub fn gen_moves_legal(&mut self, board_state:&BoardState) -> ChessMoveList{
+    //?for now moves are precalculated
+    pub fn gen_moves_legal(&mut self) -> ChessMoveList{
+        if self.legal_moves_calculated {
+            return self.legal_moves;
+        }
         self.legal_moves.reset();
-        self.setup_state(board_state);
 
         let king_pos = u64::trailing_zeros(self.piece_bb[self.to_move][KING]) as usize;
         if king_pos >= 64 {
@@ -529,23 +574,10 @@ impl MoveGen{
                 panic!("More than 2 checkers");
             }
         }
-
+        self.legal_moves_calculated = true;
         return self.legal_moves;
     }
     
-    //TODO filter from gen_moves_legal for now 
-    pub fn gen_moves_checks(&mut self, board_state:&BoardState) -> ChessMoveList{
-        self.check_moves.reset();
-        self.setup_state(board_state);
-        return self.check_moves;
-    }
-    //TODO filter from gen_moves_legal
-    pub fn gen_moves_captures(&mut self, board_state:&BoardState) -> ChessMoveList{
-        self.check_moves.reset();
-        self.setup_state(board_state);
-        return self.capture_moves;
-    }
-
     pub fn piece_count(&self) -> f64{
         return 
          (u64::count_ones(self.piece_bb[WHITE][PAWN]) as f64)*1.0
@@ -560,14 +592,278 @@ impl MoveGen{
         -(u64::count_ones(self.piece_bb[BLACK][QUEEN]) as f64)*9.0;
         
     }
-    pub fn update_board(&mut self, board_state:&BoardState){
+    pub fn update_state(&mut self){
+
+    }
+
+    pub fn board_setup(&mut self, board_state:&BoardState){
         self.setup_state(board_state);
+    }
+
+    pub fn perform_move(&self, chess_move:ChessMove) -> BitBoardState{
+        let origin: u8 = chess_move.origin();
+        let origin_bb: u64 = 1<<origin;
+        let target: u8 = chess_move.target();
+        let target_bb: u64 = 1<<target;
+        let flag: u8 = chess_move.flag();
+
+
+        let mut new_piece_bb: [[u64; 6]; 2] = self.piece_bb;
+        let mut new_en_passant_square: usize = NO_EN_PASSANT_SQUARE;
+        let mut new_en_passant_possible: bool = false;
+        let mut new_castle_w_k: bool = self.castle_w_k;
+        let mut new_castle_w_q: bool = self.castle_w_q;
+        let mut new_castle_b_k: bool = self.castle_b_k;
+        let mut new_castle_b_q: bool = self.castle_b_k;
+
+        let mut move_piece = ||{
+            //get which piece is being moved
+            let mut piece:usize = 0;
+            for i in 0..6{
+                if new_piece_bb[self.to_move][i] & origin_bb != 0 {piece = i; break;}
+            }
+
+            //remove pieces from origin square
+            new_piece_bb[self.to_move][piece] &= !origin_bb;
+
+            //add new piece
+            new_piece_bb[self.to_move][piece] |= target_bb;
+
+        };
+
+        match flag {
+            NO_FLAG => {
+                move_piece();
+
+                //capture other pieces
+                new_piece_bb[self.other][PAWN] &= !target_bb;
+                new_piece_bb[self.other][KNIGHT] &= !target_bb;
+                new_piece_bb[self.other][BISHOP] &= !target_bb;
+                new_piece_bb[self.other][ROOK] &= !target_bb;
+                new_piece_bb[self.other][QUEEN] &= !target_bb;
+
+            }
+            DOUBLE_PAWN_MOVE => {
+                new_piece_bb[self.to_move][PAWN] &= !origin_bb;
+                new_piece_bb[self.to_move][PAWN] |= target_bb;
+
+                if self.to_move == WHITE {
+                    new_en_passant_square = (origin + 8) as usize;
+                    new_en_passant_possible = true;
+                }else{
+                    new_en_passant_square = (origin - 8) as usize;
+                    new_en_passant_possible = true;
+                }
+            }
+            BLACK_EN_PASSANT => {
+                move_piece();
+                new_piece_bb[WHITE][PAWN] &= !(target_bb << 8);
+            }
+            WHITE_EN_PASSANT => {
+                move_piece();
+                new_piece_bb[BLACK][PAWN] &= !(target_bb >> 8);
+            }
+            B_CASTLE_QUEEN => {
+                new_piece_bb[BLACK][KING] = 1 << 58; //overwrite king bb with new position
+                new_piece_bb[BLACK][ROOK] &= !(1 << 56); //remove corner rook
+                new_piece_bb[BLACK][ROOK] |= 1 << 59; //add new rook position
+            }
+            B_CASTLE_KING => {
+                new_piece_bb[BLACK][KING] = 1 << 62; //overwrite king bb with new position
+                new_piece_bb[BLACK][ROOK] &= !(1 << 63); //remove corner rook
+                new_piece_bb[BLACK][ROOK] |= 1 << 61; //add new rook position
+            }
+            W_CASTLE_QUEEN => {
+                new_piece_bb[WHITE][KING] = 1 << 2; //overwrite king bb with new position
+                new_piece_bb[WHITE][ROOK] &= !(1 << 0); //remove corner rook
+                new_piece_bb[WHITE][ROOK] |= 1 << 3; //add new rook position
+            }
+            W_CASTLE_KING => {
+                new_piece_bb[WHITE][KING] = 1 << 6; //overwrite king bb with new position
+                new_piece_bb[WHITE][ROOK] &= !(1 << 7); //remove corner rook
+                new_piece_bb[WHITE][ROOK] |= 1 << 5; //add new rook position
+            }
+            PROMOTE_TO_QUEEN => {
+                new_piece_bb[self.to_move][PAWN] &= !origin_bb;
+                new_piece_bb[self.to_move][QUEEN] |= target_bb;
+
+                //capture other pieces
+                new_piece_bb[self.other][PAWN] &= !target_bb;
+                new_piece_bb[self.other][KNIGHT] &= !target_bb;
+                new_piece_bb[self.other][BISHOP] &= !target_bb;
+                new_piece_bb[self.other][ROOK] &= !target_bb;
+                new_piece_bb[self.other][QUEEN] &= !target_bb;
+            }
+            PROMOTE_TO_ROOK => {
+                new_piece_bb[self.to_move][PAWN] &= !origin_bb;
+                new_piece_bb[self.to_move][ROOK] |= target_bb;
+
+                //capture other pieces
+                new_piece_bb[self.other][PAWN] &= !target_bb;
+                new_piece_bb[self.other][KNIGHT] &= !target_bb;
+                new_piece_bb[self.other][BISHOP] &= !target_bb;
+                new_piece_bb[self.other][ROOK] &= !target_bb;
+                new_piece_bb[self.other][QUEEN] &= !target_bb;
+            }
+            PROMOTE_TO_BISHOP => {
+                new_piece_bb[self.to_move][PAWN] &= !origin_bb;
+                new_piece_bb[self.to_move][BISHOP] |= target_bb;
+
+                //capture other pieces
+                new_piece_bb[self.other][PAWN] &= !target_bb;
+                new_piece_bb[self.other][KNIGHT] &= !target_bb;
+                new_piece_bb[self.other][BISHOP] &= !target_bb;
+                new_piece_bb[self.other][ROOK] &= !target_bb;
+                new_piece_bb[self.other][QUEEN] &= !target_bb;
+            }
+            PROMOTE_TO_KNIGHT => {
+                new_piece_bb[self.to_move][PAWN] &= !origin_bb;
+                new_piece_bb[self.to_move][KNIGHT] |= target_bb;
+
+                //capture other pieces
+                new_piece_bb[self.other][PAWN] &= !target_bb;
+                new_piece_bb[self.other][KNIGHT] &= !target_bb;
+                new_piece_bb[self.other][BISHOP] &= !target_bb;
+                new_piece_bb[self.other][ROOK] &= !target_bb;
+                new_piece_bb[self.other][QUEEN] &= !target_bb;
+            }
+            _ => {
+                panic!("Illegal flag move attempted")
+            }
+        }
+
+        const WHITE_KING_CASTLE_PIECES:u64 = (1 << 4) | (1 << 0);
+        const WHITE_QUEEN_CASTLE_PIECES:u64 = (1 << 4) | (1 << 7);
+        const BLACK_KING_CASTLE_PIECES:u64 = (1 << 60) | (1 << 54);
+        const BLACK_QUEEN_CASTLE_PIECES:u64 = (1 << 60) | (1 << 63);
+        
+        if WHITE_KING_CASTLE_PIECES & (origin_bb | target_bb) != 0{
+            new_castle_w_k = false;
+        }
+        if WHITE_QUEEN_CASTLE_PIECES & (origin_bb | target_bb) != 0{
+            new_castle_w_q = false;
+        }
+        if BLACK_KING_CASTLE_PIECES & (origin_bb | target_bb) != 0{
+            new_castle_b_k = false;
+        }
+        if BLACK_QUEEN_CASTLE_PIECES & (origin_bb | target_bb) != 0{
+            new_castle_b_q = false;
+        }
+
+        if flag != DOUBLE_PAWN_MOVE {
+            new_en_passant_possible = false;
+            new_en_passant_square = NO_EN_PASSANT_SQUARE;
+        }
+
+        let mut new_color_mask:[u64; 2] = [0; 2];
+        new_color_mask[WHITE] = new_piece_bb[WHITE][PAWN] |
+                                new_piece_bb[WHITE][KNIGHT] |
+                                new_piece_bb[WHITE][BISHOP] |
+                                new_piece_bb[WHITE][ROOK] |
+                                new_piece_bb[WHITE][QUEEN] |
+                                new_piece_bb[WHITE][KING];
+        new_color_mask[BLACK] = new_piece_bb[BLACK][PAWN] |
+                                new_piece_bb[BLACK][KNIGHT] |
+                                new_piece_bb[BLACK][BISHOP] |
+                                new_piece_bb[BLACK][ROOK] |
+                                new_piece_bb[BLACK][QUEEN] |
+                                new_piece_bb[BLACK][KING];
+
+        return Self { 
+            piece_bb: new_piece_bb, 
+            to_move: self.other, 
+            other: self.to_move, 
+            en_passant_square: new_en_passant_square,
+            en_passant_possible: new_en_passant_possible, 
+            castle_w_k: new_castle_w_k, 
+            castle_w_q: new_castle_w_q, 
+            castle_b_k: new_castle_b_k, 
+            castle_b_q: new_castle_b_q,
+
+            legal_moves: ChessMoveList::new(), //move lists should only be instansiated here
+            legal_moves_calculated: false,
+
+
+            color_mask: new_color_mask,
+            checkers: 0,
+            check_line: 0,
+            pinned_pieces: 0,
+            pinned_pieces_indicies: [64; 8], //value 64 represents no pinned piece
+            pin_lines: [0; 8],
+            rank_2th: [bit_boards::RANK_7, bit_boards::RANK_2]
+        };
+    }
+
+    pub fn white_to_move(&self) -> bool {
+        return self.to_move == WHITE;
+    }
+
+    pub fn piece_value(&self, square:usize) -> f64 {
+        assert!(square < 64);
+        if self.piece_bb[WHITE][PAWN] & (1 << square) != 0 {return 1.0}
+        if self.piece_bb[WHITE][KNIGHT] & (1 << square) != 0 {return 3.0}
+        if self.piece_bb[WHITE][BISHOP] & (1 << square) != 0 {return 3.5}
+        if self.piece_bb[WHITE][ROOK] & (1 << square) != 0 {return 5.0}
+        if self.piece_bb[WHITE][QUEEN] & (1 << square) != 0 {return 9.0}
+        if self.piece_bb[BLACK][PAWN] & (1 << square) != 0 {return -1.0}
+        if self.piece_bb[BLACK][KNIGHT] & (1 << square) != 0 {return -3.0}
+        if self.piece_bb[BLACK][BISHOP] & (1 << square) != 0 {return -3.5}
+        if self.piece_bb[BLACK][ROOK] & (1 << square) != 0 {return -5.0}
+        if self.piece_bb[BLACK][QUEEN] & (1 << square) != 0 {return -9.0}
+
+
+        return 0.0;
+    }
+
+    pub fn game_state(&mut self) -> GameState{
+        //use allready calculated moves if possible
+        if self.legal_moves_calculated {
+            if self.legal_moves.size_fast() == 0{
+                if self.checkers != 0 { //to move side is in checkmate
+                    if self.to_move == WHITE{
+                        return GameState::Black;
+                    }else{
+                        return GameState::White;
+                    }
+                }else{
+                    return GameState::Draw; //to move side has no moves but is not in check
+                }
+            }else{
+                return GameState::Playing;
+            }
+        }
+        //check for only king moves, this does not need to precompute anything
+        else{
+            self.legal_king_moves();
+            let legal_king_moves = self.legal_moves.size_fast();
+            self.legal_moves.reset();
+            if legal_king_moves >= 2 { 
+                return GameState::Playing;
+            }
+        }
+        //finally if all else fails, do a full search of all moves to check if there are 0 legal moves
+        if self.gen_moves_legal().size_fast() == 0{
+            if self.checkers != 0 { //to move side is in checkmate
+                if self.to_move == WHITE{
+                    return GameState::Black;
+                }else{
+                    return GameState::White;
+                }
+            }else{
+                return GameState::Draw; //to move side has no moves but is not in check
+            }
+        }else{
+            return GameState::Playing;
+        }
+    }
+
+    pub fn piece_bb(&self) -> [[u64; 6]; 2]{
+        return self.piece_bb;
     }
 }
 
 
-
-impl Clone for MoveGen{
+impl Clone for BitBoardState{
     fn clone(&self) -> Self {
         Self {
             piece_bb: [[0; 6]; 2],
@@ -581,8 +877,7 @@ impl Clone for MoveGen{
             castle_b_q: false,
 
             legal_moves: ChessMoveList::new(), //move lists should only be instansiated here
-            check_moves: ChessMoveList::new(), //move lists should only be instansiated here
-            capture_moves: ChessMoveList::new(), //move lists should only be instansiated here
+            legal_moves_calculated: false,
 
             color_mask: [0; 2],
             checkers: 0,
@@ -595,6 +890,6 @@ impl Clone for MoveGen{
     }
 }
 
-impl Copy for MoveGen{
+impl Copy for BitBoardState{
 
 }

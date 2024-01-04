@@ -337,3 +337,24 @@ pub fn west_of(square:usize) -> u64{
     WEST_OF[square%8]
 }
 
+/*
+
+pub fn rook_attacks(square: u32, occupancies: u64) -> u64 {
+    let entry = &ROOK_MAGICS[square];
+    let index = magic_index(occupancies, entry);
+
+    Bitboard(ROOK_MAP[index as usize])
+}
+
+pub fn bishop_attacks(square: u32, occupancies: u64) -> u64 {
+    let entry = &BISHOP_MAGICS[square];
+    let index = magic_index(occupancies, entry);
+
+    Bitboard(BISHOP_MAP[index as usize])
+}
+
+const fn magic_index(occupancies: u64, entry: &MagicEntry) -> u32 {
+    let mut hash = occupancies & entry.mask;
+    hash = hash.wrapping_mul(entry.magic) >> entry.shift;
+    hash as u32 + entry.offset
+}*/

@@ -6,7 +6,7 @@
 
 //Piece codes
 
-use super::move_gen::MoveGen;
+use super::state_bitboard::BitBoardState;
 
 
 
@@ -181,6 +181,10 @@ impl ChessMove{
         return self.move_data == 0;
     }
 
+    pub fn move_data(&self) -> u16{
+        return self.move_data;
+    }
+
 }
 
 impl Clone for ChessMove{
@@ -231,9 +235,15 @@ impl ChessMoveList{
         return size;
     }
 
+    //NOTE: this does not work if the moves are mutated
+    pub fn size_fast(&self) -> usize{
+        return self.index as usize;
+    }
+
     pub fn moves(&self) -> &[ChessMove; 218]{
         return &self.chess_moves;
     }
+    
     pub fn moves_vec(&self) -> Vec<ChessMove>{
         let mut moves = Vec::<ChessMove>::with_capacity(218);
         for i in 0..self.index as usize{
@@ -245,9 +255,6 @@ impl ChessMoveList{
     }
 
     pub fn reset(&mut self) {
-        for i in 0..218{
-            self.chess_moves[i].move_data = 0;
-        }
         self.index = 0;
     }
 }

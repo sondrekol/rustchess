@@ -7,8 +7,8 @@ mod board2tests;
 mod bot;
 mod bot2;
 mod bot2bench;
-mod move_gen;
-mod move_gen_test;
+mod state_bitboard;
+mod state_bitboard_tests;
 pub struct GameManager{
     player_color: bool,
     board_state: BoardState,

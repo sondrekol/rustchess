@@ -3,7 +3,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::game_manager::move_gen::bit_boards;
+    use crate::game_manager::state_bitboard::bit_boards;
 
 
     #[test]

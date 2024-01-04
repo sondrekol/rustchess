@@ -1,6 +1,9 @@
 use std::{thread::{self, JoinHandle}, ptr::null, time::SystemTime};
 
-use self::{board2::{BoardState, ChessMove}, bot::{Bot, GetMoveResult}, bot2::Bot2};
+use self::{board2::{BoardState, ChessMove},
+bot::{Bot, GetMoveResult}, 
+bot2::Bot2, 
+state_bitboard::bit_boards::{populate_rook_moves, populate_bishop_moves}};
 
 mod board2;
 mod board2tests;
@@ -22,6 +25,10 @@ pub struct GameManager{
 impl GameManager{
 
     pub fn new_game(color: bool, fen: &str) -> Self{
+        //setup rook and bisshop moves
+        state_bitboard::bit_boards::populate_rook_moves();
+        state_bitboard::bit_boards::populate_bishop_moves();
+        
         Self{
             player_color: color,
             turn: true,

@@ -3,7 +3,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::game_manager::state_bitboard::bit_boards;
+    use crate::game_manager::state_bitboard::bit_boards::{self, RookMoves, populate_bishop_moves, populate_rook_moves};
 
 
     #[test]
@@ -56,5 +56,29 @@ mod tests {
             assert_eq!(expected_north[i], bit_boards::north(i*10), "failed for north: {}", i*10);
             assert_eq!(expected_south[i], bit_boards::south(i*10), "failed for south: {}", i*10);
         }
+    }
+
+    //Use https://tearth.dev/bitboard-viewer/ to check results
+    #[test]
+    fn moves_for_rook_test(){
+        populate_rook_moves();
+        let rook_pos = 0;
+        let blockers = 0xffff00000000ffff;
+        assert_eq!(RookMoves::mov_map(rook_pos, blockers), 0x102);
+
+        let rook_pos:usize = 0;
+        assert_eq!(RookMoves::mov_map(rook_pos, 0), 0x1010101010101fe);
+
+        let rook_pos:usize = 1;
+        assert_eq!(RookMoves::mov_map(rook_pos, 0), 0x2020202020202fd);
+
+        let rook_pos:usize = 32;
+        let blockers:u64 = 0x20481c0000000;
+        assert_eq!(RookMoves::mov_map(rook_pos, blockers), 0x10101fe01010101);
+        
+    }
+    #[test]
+    fn moves_for_bishop_test(){
+        populate_bishop_moves();
     }
 }

@@ -8,7 +8,12 @@ mod tests {
     use std::time::SystemTime;
 
     use crate::game_manager::board2::{BoardState, ChessMove};
-    use crate::game_manager::state_bitboard::BitBoardState;
+    use crate::game_manager::state_bitboard::{BitBoardState, bit_boards};
+
+    fn setup_sliding_magics(){
+        bit_boards::populate_rook_moves();
+        bit_boards::populate_bishop_moves();
+    }
 
     fn string_square(square:u8) -> String{
         let mut str = "".to_owned();
@@ -40,6 +45,7 @@ mod tests {
 
     #[test]
     fn get_moves_test(){
+        setup_sliding_magics();
         let board_state = BoardState::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         let mut bit_board_state = BitBoardState::new();
         bit_board_state.board_setup(&board_state);
@@ -50,14 +56,14 @@ mod tests {
 
     #[test]
     fn number_of_legal_moves() {
-
+        setup_sliding_magics();
         let fens = [
             "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-            "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
             "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8",
+            "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
             "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 ",
             "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - "];
-        let expected = [20, 6, 44, 46, 14];
+        let expected = [20, 44, 6, 46, 14];
 
         for i in 0..5{
             let fen = fens[i];
@@ -194,6 +200,7 @@ mod tests {
 
     #[test]
     fn perft_test(){
+        setup_sliding_magics();
         let board_state = BoardState::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         let mut bit_board_state = BitBoardState::new();
         bit_board_state.board_setup(&board_state);

@@ -1,4 +1,6 @@
+use self::magics::{ROOK_MAP_SIZE, BISHOP_MAP_SIZE, ROOK_MAGICS, BISHOP_MAGICS, MagicEntry};
 
+mod magics;
 
 
 pub const RANK_1:u64 = 0x00000000000000FF;
@@ -87,7 +89,7 @@ pub struct RookMoves{
 
 }
 impl RookMoves{
-    pub fn mov_map(pos:usize, blockers:u64) -> u64{// !temp until magics
+    pub fn generate_rook_moves(pos:usize, blockers:u64) -> u64{
         let pos = pos as i32;
         let mut map:u64 = 0;
 
@@ -111,6 +113,13 @@ impl RookMoves{
             }
         }
         return map;
+    }
+
+    pub fn mov_map(pos:usize, blockers:u64) -> u64{// !temp until magics
+        //return Self::generate_rook_moves(pos, blockers);
+        unsafe{
+            return ROOK_MOVES[magic_index(blockers, &magics::ROOK_MAGICS[pos])];
+        }
     }
 }
 
@@ -155,7 +164,7 @@ pub struct BishopMoves{
 
 }
 impl BishopMoves{
-    pub fn mov_map(pos:usize, blockers:u64) -> u64{// !TEMP UNTIL MAGICS
+    pub fn generate_bishop_moves(pos:usize, blockers:u64) -> u64{
         let pos = pos as i32;
         let mut map:u64 = 0;
 
@@ -180,6 +189,14 @@ impl BishopMoves{
         }
         return map;
     }
+    pub fn mov_map(pos:usize, blockers:u64) -> u64{// !TEMP UNTIL MAGICS
+        //return Self::generate_bishop_moves(pos, blockers);
+        unsafe{
+            return BISHOP_MOVES[magic_index(blockers, &magics::BISHOP_MAGICS[pos])];
+        }
+    }
+
+
 }
 
 //KING
@@ -337,24 +354,59 @@ pub fn west_of(square:usize) -> u64{
     WEST_OF[square%8]
 }
 
-/*
+static mut ROOK_MOVES:[u64; ROOK_MAP_SIZE] = [0;ROOK_MAP_SIZE];
 
-pub fn rook_attacks(square: u32, occupancies: u64) -> u64 {
-    let entry = &ROOK_MAGICS[square];
-    let index = magic_index(occupancies, entry);
 
-    Bitboard(ROOK_MAP[index as usize])
+pub fn populate_rook_moves(){
+    //Generate rook_moves
+    for i in 0..64{
+        let entry = &ROOK_MAGICS[i];
+        let mut blockers = entry.mask + 1 ;
+        loop {
+
+            blockers = (blockers - 1) & entry.mask;
+            let index = magic_index(blockers, entry);
+
+            unsafe{
+                ROOK_MOVES[index] = RookMoves::generate_rook_moves(i, blockers);
+            }
+
+            if blockers == 0 {
+                break;
+            }
+        }
+
+        //TODO loop trough all subsets of mask
+    }
 }
 
-pub fn bishop_attacks(square: u32, occupancies: u64) -> u64 {
-    let entry = &BISHOP_MAGICS[square];
-    let index = magic_index(occupancies, entry);
+static mut BISHOP_MOVES:[u64; BISHOP_MAP_SIZE] = [0; BISHOP_MAP_SIZE];
 
-    Bitboard(BISHOP_MAP[index as usize])
+pub fn populate_bishop_moves(){
+    //Generate bishop moves
+    for i in 0..64{
+        let entry = &BISHOP_MAGICS[i];
+
+        let mut blockers = entry.mask + 1 ;
+        loop {
+
+            blockers = (blockers - 1) & entry.mask;
+            let index = magic_index(blockers, entry);
+
+            unsafe{
+                BISHOP_MOVES[index] = BishopMoves::generate_bishop_moves(i, blockers);
+            }
+            
+
+            if blockers == 0 {
+                break;
+            }
+        }
+    }
 }
 
-const fn magic_index(occupancies: u64, entry: &MagicEntry) -> u32 {
-    let mut hash = occupancies & entry.mask;
+fn magic_index(blockers: u64, entry:&MagicEntry) -> usize{
+    let mut hash = blockers & entry.mask;
     hash = hash.wrapping_mul(entry.magic) >> entry.shift;
-    hash as u32 + entry.offset
-}*/
+    return hash as usize + entry.offset
+}

@@ -2,7 +2,7 @@
 
 use super::board2::{BoardState, ChessMoveList, ChessMove, GameState};
 
-mod bit_boards;
+pub mod bit_boards;
 mod bit_boards_tests;
 
 //Piece indexes

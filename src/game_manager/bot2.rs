@@ -17,8 +17,8 @@ pub struct Bot2{
 impl Bot for Bot2{
     fn new() -> Self{
         Self{
-            search_depth: 4,
-            max_depth: 10,
+            search_depth: 6,
+            max_depth: 6,
             num_pos: 0
         }
     }
@@ -136,7 +136,7 @@ impl Bot2 {
             //Maybe maybe not
             let mut extension = 0;
             if bit_board_state.piece_value(chess_move.target() as usize) != 0.0 {
-                extension = 1;
+                //extension = 1;
             }
 
             //check captured piece //?Implement later if needed

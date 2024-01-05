@@ -99,7 +99,8 @@ pub enum GameState{
 
 
 pub struct ChessMove{
-    move_data:u16
+    move_data:u16,
+    promising_level:i32
 }
 
 pub struct ChessMoveList{
@@ -148,18 +149,25 @@ impl ChessMove{
     last 6 bits are the index of the origin square
      */
     pub fn new_empty() -> Self{
-        Self { move_data: 0 }
+        Self { 
+            move_data: 0,
+            promising_level: 0
+        }
     }
 
     pub fn new_exact(move_data:u16) -> Self{
-        Self { move_data: move_data }
+        Self { 
+            move_data: move_data,
+            promising_level: 0
+        }
     }
 
     pub fn from_indices(flags: u8, origin:u8, target: u8) -> Self{
         Self { 
             move_data:  (((flags as u16) & 0x0F) << 12) | 
                         (((target as u16) & 0x3F) << 6) | 
-                        (((origin as u16) & 0x3F))
+                        (((origin as u16) & 0x3F)),
+            promising_level: 0
         }
     }
 
@@ -185,11 +193,19 @@ impl ChessMove{
         return self.move_data;
     }
 
+    pub fn promising_level_mut(&mut self) -> &mut i32{
+        return &mut self.promising_level;
+    }
+
+    pub fn promising_level(&self) -> &i32{
+        return &self.promising_level;
+    }
+
 }
 
 impl Clone for ChessMove{
     fn clone(&self) -> Self {
-        Self { move_data: self.move_data }
+        Self { move_data: self.move_data , promising_level: self.promising_level}
     }
 }
 
@@ -203,9 +219,9 @@ impl PartialEq for ChessMove {
 
 impl ChessMoveList{
     pub fn new() -> Self{
-        Self { 
+        Self {
             index: 0, 
-            chess_moves: [ChessMove{move_data: 0}; 218]
+            chess_moves: [ChessMove{move_data: 0, promising_level: 0}; 218]
         }
     }
 
@@ -1215,7 +1231,8 @@ impl BoardState{
         let mut chess_move:ChessMove;
         //TODO: create ChessMove
         chess_move = ChessMove{
-            move_data: (flag as u16) << 12 | origin as u16 | (target as u16) << 6
+            move_data: (flag as u16) << 12 | origin as u16 | (target as u16) << 6,
+            promising_level: 0
         };
         let legal_moves = self.legal_moves().chess_moves;
 

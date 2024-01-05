@@ -28,7 +28,7 @@ impl Bot for Bot2{
     fn new() -> Self{
         Self{
             search_depth: 6,
-            max_depth: 20,
+            max_depth: 6,
             num_pos: 0,
             table: HashMap::<(BoardStateNumbers, usize), i32, BuildHasherDefault<FxHasher>>::default()
         }
@@ -48,7 +48,7 @@ impl Bot for Bot2{
 
 impl Bot2 {
 
-    fn promising_move(&self, bit_board_state:&mut BitBoardState, chess_move: &ChessMove) -> i32{
+    fn promising_move(&self, bit_board_state:&mut BitBoardState, chess_move: &mut ChessMove){
         let mut promising_level = 0;
 
         let origin_value = bit_board_state.piece_value(chess_move.origin() as usize);
@@ -90,7 +90,8 @@ impl Bot2 {
             _ => {println!("INVALID MOVE FLAG")}
         }
 
-        return promising_level;
+        let mut promising_level_ref = chess_move.promising_level_mut();
+        *promising_level_ref = promising_level;
     }
     
     fn evaluate(&mut self, bit_board_state:&mut BitBoardState) -> i32{
@@ -140,20 +141,27 @@ impl Bot2 {
         let mut min:i32 = i32::MAX;
         let mut max:i32 = i32::MIN;
 
+        for i in 0..moves.len(){
+            self.promising_move(bit_board_state, &mut moves[i]);
+        }
+
+        moves.sort_by(|a, b| 
+            a.promising_level()
+            .cmp(&b.promising_level())
+            );
 
         if bit_board_state.white_to_move() {
             moves.sort_by(|a, b| 
-                self.promising_move(bit_board_state, a)
-                .partial_cmp(&self.promising_move(bit_board_state, b))
-                .unwrap().reverse()
+                a.promising_level()
+                .cmp(&b.promising_level())
+                .reverse()
                 )
         }
         else {
             moves.sort_by(|a, b| 
-                self.promising_move(bit_board_state, a)
-                .partial_cmp(&self.promising_move(bit_board_state, b))
-                .unwrap()
-            )
+                a.promising_level()
+                .cmp(&b.promising_level())
+                )
         };
 
         let mut min_move:ChessMove = *moves.get(0).unwrap();

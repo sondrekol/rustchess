@@ -99,7 +99,7 @@ impl Bot2 {
         let mut eval:i32 = 0;
 
 
-        //eval += (fastrand::f64() - 0.5)*0.001;
+        eval += fastrand::i32(-5..5);
 
         let to_move = if bit_board_state.white_to_move() {1} else {0};
         let other = if to_move == 1 {0} else {1};

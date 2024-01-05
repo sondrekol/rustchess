@@ -1,5 +1,7 @@
 
 
+use self::bit_boards::BOARD_CENTER;
+
 use super::board2::{BoardState, ChessMoveList, ChessMove, GameState};
 
 pub mod bit_boards;
@@ -46,6 +48,14 @@ const BLACK_EN_PASSANT:u8 = 0b1001;
 const DOUBLE_PAWN_MOVE:u8 = 0b1010;
 
 const NO_FLAG:u8 = 0b1111;
+
+
+//smaller state used for transposition table
+#[derive(Hash, PartialEq, Eq)]
+pub struct BoardStateNumbers{
+    piece_bb: [[u64; 6];2],
+    data: u8,
+}
 
 
 /*
@@ -801,14 +811,14 @@ impl BitBoardState{
     pub fn piece_value(&self, square:usize) -> f64 {
         assert!(square < 64);
         if self.piece_bb[WHITE][PAWN] & (1 << square) != 0 {return 1.0}
-        if self.piece_bb[WHITE][KNIGHT] & (1 << square) != 0 {return 3.0}
-        if self.piece_bb[WHITE][BISHOP] & (1 << square) != 0 {return 3.5}
-        if self.piece_bb[WHITE][ROOK] & (1 << square) != 0 {return 5.0}
-        if self.piece_bb[WHITE][QUEEN] & (1 << square) != 0 {return 9.0}
         if self.piece_bb[BLACK][PAWN] & (1 << square) != 0 {return -1.0}
+        if self.piece_bb[WHITE][KNIGHT] & (1 << square) != 0 {return 3.0}
         if self.piece_bb[BLACK][KNIGHT] & (1 << square) != 0 {return -3.0}
+        if self.piece_bb[WHITE][BISHOP] & (1 << square) != 0 {return 3.5}
         if self.piece_bb[BLACK][BISHOP] & (1 << square) != 0 {return -3.5}
+        if self.piece_bb[WHITE][ROOK] & (1 << square) != 0 {return 5.0}
         if self.piece_bb[BLACK][ROOK] & (1 << square) != 0 {return -5.0}
+        if self.piece_bb[WHITE][QUEEN] & (1 << square) != 0 {return 9.0}
         if self.piece_bb[BLACK][QUEEN] & (1 << square) != 0 {return -9.0}
 
 
@@ -859,6 +869,23 @@ impl BitBoardState{
 
     pub fn piece_bb(&self) -> [[u64; 6]; 2]{
         return self.piece_bb;
+    }
+
+    pub fn board_state_numbers(&self) -> BoardStateNumbers{
+        let mut castle_rights = 0;
+        castle_rights |= if self.castle_w_k {0b0001} else {0};
+        castle_rights |= if self.castle_w_q {0b0010} else {0};
+        castle_rights |= if self.castle_b_k {0b0100} else {0};
+        castle_rights |= if self.castle_b_q {0b1000} else {0};
+        BoardStateNumbers{
+            piece_bb: self.piece_bb,
+            data: (self.to_move as u8) << 7 | ((self.en_passant_square%8) as u8) << 4 | castle_rights
+        }
+    }
+
+
+    pub fn knights_in_center(&self, color: usize) -> i32{
+        return u64::count_ones(self.piece_bb[color][KNIGHT] & BOARD_CENTER) as i32;
     }
 }
 

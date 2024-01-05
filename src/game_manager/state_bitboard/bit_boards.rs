@@ -410,3 +410,6 @@ fn magic_index(blockers: u64, entry:&MagicEntry) -> usize{
     hash = hash.wrapping_mul(entry.magic) >> entry.shift;
     return hash as usize + entry.offset
 }
+
+
+pub const BOARD_CENTER:u64 = 0x00003c3c3c3c0000;

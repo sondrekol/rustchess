@@ -199,7 +199,7 @@ mod tests {
     }
 
     #[test]
-    fn perft_test(){
+    fn perft_test_start_pos(){
         setup_sliding_magics();
         let board_state = BoardState::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         let mut bit_board_state = BitBoardState::new();
@@ -211,7 +211,8 @@ mod tests {
         assert_eq!(perft(&mut bit_board_state, 4), 197281);
         assert_eq!(perft(&mut bit_board_state, 5), 4865609);
         assert_eq!(perft(&mut bit_board_state, 6), 119060324);
-        //assert_eq!(perft(&mut bit_board_state, 7), 3195901860);
+        assert_eq!(perft(&mut bit_board_state, 7), 3195901860);
+        assert_eq!(perft(&mut bit_board_state, 8), 84998978956);
 
         let elapsed = start.elapsed().unwrap().as_millis();
         println!("perft 1-6 finished in {elapsed}ms");

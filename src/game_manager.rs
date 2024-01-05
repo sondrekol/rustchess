@@ -28,7 +28,7 @@ impl GameManager{
         //setup rook and bisshop moves
         state_bitboard::bit_boards::populate_rook_moves();
         state_bitboard::bit_boards::populate_bishop_moves();
-        
+
         Self{
             player_color: color,
             turn: true,
@@ -56,7 +56,7 @@ impl GameManager{
 
                 self.bot_start_time = SystemTime::now();
                 let board_state = self.board_state.clone();
-                let bot = self.bot;
+                let bot = self.bot.clone();
 
                 self.bot_thread = Some(thread::spawn(move ||{
                     return bot.clone().get_move(board_state);

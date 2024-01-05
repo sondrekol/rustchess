@@ -53,7 +53,8 @@ const NO_FLAG:u8 = 0b1111;
 //smaller state used for transposition table
 #[derive(Hash, PartialEq, Eq)]
 pub struct BoardStateNumbers{
-    piece_bb: [[u64; 6];2],
+    piece_bb: [u64; 6],
+    piece_bb_color: [u64; 2],
     data: u8,
 }
 
@@ -185,7 +186,7 @@ impl BitBoardState{
     fn generate_moves_target_masked(&mut self, origin_square: usize, mut targets: u64, flag: u8, mask: u64) {
         targets &= !mask;
         while targets != 0 {
-            let target = bit_boards::pop_LSB(&mut targets);
+            let target = bit_boards::pop_lsb(&mut targets);
             self.legal_moves.add_no_alloc(origin_square as u8, target as u8, flag);
         }
     }
@@ -193,7 +194,7 @@ impl BitBoardState{
     //like generate_moves but does not add moves moving into attacked square
     fn generate_moves_for_king(&mut self, origin_square: usize, mut targets: u64, flag: u8) {
         while targets != 0 {
-            let target = bit_boards::pop_LSB(&mut targets);
+            let target = bit_boards::pop_lsb(&mut targets);
             if self.attackers(target) != 0 {
                 continue;
             }
@@ -206,13 +207,15 @@ impl BitBoardState{
             return;
         }
 
+
         //check if results in check
         let king_pos = u64::trailing_zeros(self.piece_bb[self.to_move][KING]) as usize;
         let captured_by_enpassant = if self.to_move == WHITE {en_passant_square >> 8} else {en_passant_square << 8};
         if pawn/8 == king_pos/8 {//if pawn and king are on same file
             let rook_moves_bb = bit_boards::RookMoves::mov_map(
                 king_pos, 
-                (self.color_mask[WHITE] | self.color_mask[BLACK]) & !((1 << captured_by_enpassant)|(1 << pawn)));
+                (self.color_mask[WHITE] | self.color_mask[BLACK]) & !(captured_by_enpassant|(1 << pawn)));
+
             let king_rook_bb:u64;
             if pawn%8 < king_pos%8 {//never equal, as it would imply pawn and king occupy the same square
                 king_rook_bb = rook_moves_bb & bit_boards::west(king_pos);
@@ -243,14 +246,15 @@ impl BitBoardState{
     //generates legal pawn moves for pawns on 2nd rank
     fn legal_pawn_on_2nd(&mut self, mut pawns: u64, mask:u64){
         while pawns != 0 {
-            let pawn = bit_boards::pop_LSB(&mut pawns);
+            let pawn = bit_boards::pop_lsb(&mut pawns);
             let normal_captures = bit_boards::PAWN_CAPTURES[self.to_move][pawn] & self.color_mask[self.other];
             let normal_move = if self.to_move == WHITE {pawn+8} else {pawn-8};
             let normal_moves = normal_captures | ((1 << normal_move) & !(self.color_mask[self.to_move] | self.color_mask[self.other]));
 
             self.generate_moves_target_masked(pawn, normal_moves, 0b1111, mask);
             if (1 << normal_move) & (self.color_mask[self.to_move] | self.color_mask[self.other]) == 0{
-                let double_move = (1 << (if self.to_move == WHITE {pawn+16} else {pawn-16})) & !(self.color_mask[self.to_move] | self.color_mask[self.other]);
+                let double_pawn_offset = (-16 + 32*self.to_move as i32) as i32; //Hacky as fuck, but may help branch predictor
+                let double_move = (1 << double_pawn_offset) & !(self.color_mask[self.to_move] | self.color_mask[self.other]);
                 self.generate_moves_target_masked(pawn, double_move, 0b1010, mask);
             }
         }
@@ -259,7 +263,7 @@ impl BitBoardState{
     //generates legal pawn moves for pawns on 7th rank
     fn legal_pawn_on_7th(&mut self, mut pawns: u64, mask:u64){
         while pawns != 0 {
-            let pawn = bit_boards::pop_LSB(&mut pawns);
+            let pawn = bit_boards::pop_lsb(&mut pawns);
             let normal_captures = bit_boards::PAWN_CAPTURES[self.to_move][pawn] & self.color_mask[self.other];
             let normal_move = if self.to_move == WHITE {pawn+8} else {pawn-8};
             let normal_moves = normal_captures | ((1 << normal_move) & !(self.color_mask[self.to_move] | self.color_mask[self.other]));
@@ -273,7 +277,7 @@ impl BitBoardState{
     //generates legal pawn moves for pawns neither on 7th nor 2nd rank
     fn legal_pawn_mid_board(&mut self, mut pawns: u64, mask:u64) {
         while pawns != 0 {
-            let pawn = bit_boards::pop_LSB(&mut pawns);
+            let pawn = bit_boards::pop_lsb(&mut pawns);
             let capture_targets = bit_boards::PAWN_CAPTURES[self.to_move][pawn];
             let normal_captures = capture_targets & self.color_mask[self.other];
             let normal_move = if self.to_move == WHITE {pawn+8} else {pawn-8};
@@ -285,7 +289,6 @@ impl BitBoardState{
                 let en_passant_capture = capture_targets & (1 << self.en_passant_square) & !mask;
                 self.generate_en_passant(pawn, en_passant_capture);
             }
-            let normal_move = if self.to_move == WHITE {pawn+8} else {pawn-8};
         }
     }
 
@@ -300,7 +303,7 @@ impl BitBoardState{
     fn legal_knight_moves(&mut self, mut knights: u64, mask:u64){
         while knights != 0 {
 
-            let knight = bit_boards::pop_LSB(&mut knights);
+            let knight = bit_boards::pop_lsb(&mut knights);
 
             let moves_bb = bit_boards::KNIGHT_MOVES[knight] & !(self.color_mask[self.to_move]);
 
@@ -341,7 +344,7 @@ impl BitBoardState{
     //Calculate all pseudo legal rook moves, on squares provided by "rooks"
     fn legal_rook_moves(&mut self, mut rooks:u64, mask:u64){
         while rooks != 0 {
-            let rook_pos =bit_boards::pop_LSB(&mut rooks);
+            let rook_pos =bit_boards::pop_lsb(&mut rooks);
 
             let moves_bb = bit_boards::RookMoves::mov_map(
                 rook_pos, 
@@ -354,7 +357,7 @@ impl BitBoardState{
     //Calculate all pseudo legal bishop moves, on squares provided by "bishops"
     fn legal_bishop_moves(&mut self, mut bishops:u64, mask:u64){
         while bishops != 0 {
-            let bishop_pos =bit_boards::pop_LSB(&mut bishops);
+            let bishop_pos =bit_boards::pop_lsb(&mut bishops);
 
             let moves_bb = bit_boards::BishopMoves::mov_map(
                 bishop_pos, 
@@ -367,7 +370,7 @@ impl BitBoardState{
     //Calculate all pseudo legal queen moves, on squares provided by "queens"
     fn legal_queen_moves(&mut self, mut queens:u64, mask:u64){
         while queens != 0 {
-            let queen_pos =bit_boards::pop_LSB(&mut queens);
+            let queen_pos =bit_boards::pop_lsb(&mut queens);
 
             let moves_bb = (bit_boards::RookMoves::mov_map(
                          queen_pos, 
@@ -588,18 +591,18 @@ impl BitBoardState{
         return self.legal_moves;
     }
     
-    pub fn piece_count(&self) -> f64{
+    pub fn piece_count(&self) -> i32{
         return 
-         (u64::count_ones(self.piece_bb[WHITE][PAWN]) as f64)*1.0
-        +(u64::count_ones(self.piece_bb[WHITE][KNIGHT]) as f64)*3.0
-        +(u64::count_ones(self.piece_bb[WHITE][BISHOP]) as f64)*3.5
-        +(u64::count_ones(self.piece_bb[WHITE][ROOK]) as f64)*5.0
-        +(u64::count_ones(self.piece_bb[WHITE][QUEEN]) as f64)*9.0
-        -(u64::count_ones(self.piece_bb[BLACK][PAWN]) as f64)*1.0
-        -(u64::count_ones(self.piece_bb[BLACK][KNIGHT]) as f64)*3.0
-        -(u64::count_ones(self.piece_bb[BLACK][BISHOP]) as f64)*3.5
-        -(u64::count_ones(self.piece_bb[BLACK][ROOK]) as f64)*5.0
-        -(u64::count_ones(self.piece_bb[BLACK][QUEEN]) as f64)*9.0;
+         (u64::count_ones(self.piece_bb[WHITE][PAWN]) as i32)*1
+        +(u64::count_ones(self.piece_bb[WHITE][KNIGHT]) as i32)*3
+        +(u64::count_ones(self.piece_bb[WHITE][BISHOP]) as i32)*3
+        +(u64::count_ones(self.piece_bb[WHITE][ROOK]) as i32)*5
+        +(u64::count_ones(self.piece_bb[WHITE][QUEEN]) as i32)*9
+        -(u64::count_ones(self.piece_bb[BLACK][PAWN]) as i32)*1
+        -(u64::count_ones(self.piece_bb[BLACK][KNIGHT]) as i32)*3
+        -(u64::count_ones(self.piece_bb[BLACK][BISHOP]) as i32)*3
+        -(u64::count_ones(self.piece_bb[BLACK][ROOK]) as i32)*5
+        -(u64::count_ones(self.piece_bb[BLACK][QUEEN]) as i32)*9;
         
     }
     pub fn update_state(&mut self){
@@ -808,21 +811,21 @@ impl BitBoardState{
         return self.to_move == WHITE;
     }
 
-    pub fn piece_value(&self, square:usize) -> f64 {
+    #[inline(always)]
+    pub fn piece_value(&self, square:usize) -> i32 {
         assert!(square < 64);
-        if self.piece_bb[WHITE][PAWN] & (1 << square) != 0 {return 1.0}
-        if self.piece_bb[BLACK][PAWN] & (1 << square) != 0 {return -1.0}
-        if self.piece_bb[WHITE][KNIGHT] & (1 << square) != 0 {return 3.0}
-        if self.piece_bb[BLACK][KNIGHT] & (1 << square) != 0 {return -3.0}
-        if self.piece_bb[WHITE][BISHOP] & (1 << square) != 0 {return 3.5}
-        if self.piece_bb[BLACK][BISHOP] & (1 << square) != 0 {return -3.5}
-        if self.piece_bb[WHITE][ROOK] & (1 << square) != 0 {return 5.0}
-        if self.piece_bb[BLACK][ROOK] & (1 << square) != 0 {return -5.0}
-        if self.piece_bb[WHITE][QUEEN] & (1 << square) != 0 {return 9.0}
-        if self.piece_bb[BLACK][QUEEN] & (1 << square) != 0 {return -9.0}
-
-
-        return 0.0;
+        let mask = 1 << square;
+        return 
+         (u64::count_ones(self.piece_bb[WHITE][PAWN] & mask) as i32)*1
+        +(u64::count_ones(self.piece_bb[WHITE][KNIGHT] & mask) as i32)*3
+        +(u64::count_ones(self.piece_bb[WHITE][BISHOP] & mask) as i32)*3
+        +(u64::count_ones(self.piece_bb[WHITE][ROOK] & mask) as i32)*5
+        +(u64::count_ones(self.piece_bb[WHITE][QUEEN] & mask) as i32)*9
+        -(u64::count_ones(self.piece_bb[BLACK][PAWN] & mask) as i32)*1
+        -(u64::count_ones(self.piece_bb[BLACK][KNIGHT] & mask) as i32)*3
+        -(u64::count_ones(self.piece_bb[BLACK][BISHOP] & mask) as i32)*3
+        -(u64::count_ones(self.piece_bb[BLACK][ROOK] & mask) as i32)*5
+        -(u64::count_ones(self.piece_bb[BLACK][QUEEN] & mask) as i32)*9;
     }
 
     pub fn game_state(&mut self) -> GameState{
@@ -877,8 +880,17 @@ impl BitBoardState{
         castle_rights |= if self.castle_w_q {0b0010} else {0};
         castle_rights |= if self.castle_b_k {0b0100} else {0};
         castle_rights |= if self.castle_b_q {0b1000} else {0};
+        let mut pieces = [0; 6];
+        for i in 0..6{
+            pieces[i] = self.piece_bb[WHITE][i] | self.piece_bb[BLACK][i];
+        }
+        let colors = [
+            self.piece_bb[BLACK][PAWN] | self.piece_bb[BLACK][KNIGHT] | self.piece_bb[BLACK][BISHOP] | self.piece_bb[BLACK][ROOK] | self.piece_bb[BLACK][QUEEN] | self.piece_bb[BLACK][KING],
+            self.piece_bb[WHITE][PAWN] | self.piece_bb[WHITE][KNIGHT] | self.piece_bb[WHITE][BISHOP] | self.piece_bb[WHITE][ROOK] | self.piece_bb[WHITE][QUEEN] | self.piece_bb[WHITE][KING],
+        ];
         BoardStateNumbers{
-            piece_bb: self.piece_bb,
+            piece_bb: pieces,
+            piece_bb_color: colors,
             data: (self.to_move as u8) << 7 | ((self.en_passant_square%8) as u8) << 4 | castle_rights
         }
     }

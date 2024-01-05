@@ -5,11 +5,11 @@ use super::board2::ChessMove;
 pub struct GetMoveResult{
     chess_move: ChessMove,
     searched_positions: usize,
-    eval: f64
+    eval: i32
 }
 
 impl GetMoveResult{
-    pub fn new(chess_move:ChessMove, searched_positions:usize, eval:f64) -> Self{
+    pub fn new(chess_move:ChessMove, searched_positions:usize, eval:i32) -> Self{
         Self { chess_move: chess_move, searched_positions: searched_positions, eval: eval}
     }
 
@@ -20,7 +20,7 @@ impl GetMoveResult{
     pub fn num_pos(&self) -> usize{
         self.searched_positions
     }
-    pub fn eval(&self) -> f64{
+    pub fn eval(&self) -> i32{
         self.eval
     }
 }

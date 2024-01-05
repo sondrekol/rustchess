@@ -7,16 +7,16 @@ mod tests {
 
 
     #[test]
-    fn pop_LSB_test(){
+    fn pop_lsb_test(){
         let mut test:[u64; 3] = [0b100010010000000100010001,
                              0b10010000100100100000,
                              0b0010000101010101000011000];
         let expect:[u64; 3] = [ 0b100010010000000100010000,
                                 0b10010000100100000000,
                                 0b0010000101010101000010000];
-        assert_eq!(0, bit_boards::pop_LSB(&mut test[0]));
-        assert_eq!(5, bit_boards::pop_LSB(&mut test[1]));
-        assert_eq!(3, bit_boards::pop_LSB(&mut test[2]));
+        assert_eq!(0, bit_boards::pop_lsb(&mut test[0]));
+        assert_eq!(5, bit_boards::pop_lsb(&mut test[1]));
+        assert_eq!(3, bit_boards::pop_lsb(&mut test[2]));
         for i in 0..3{
             assert_eq!(test[i], expect[i]);
         }

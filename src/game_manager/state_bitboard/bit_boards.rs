@@ -49,41 +49,6 @@ pub const CASTLE_B_K_LINE:u64 = 0x6000000000000000;
 pub const CASTLE_B_Q_LINE:u64 = 0x0E00000000000000;
 
 
-//ROOK
-const fn rook_attack_map_for_square(square: i32) -> u64{
-    let mut map:u64 = 0;
-    let mut i:i32 = 1;
-    while i < 8{
-        let north = square+8*i;
-        let south = square-8*i;
-        let east = square+1*i;
-        let west = square-1*i;
-        if north >= 0 && north < 64 && north%8 == square%8{// ! potential for overflow??
-            map |= 1 << north;
-        }
-        if south >= 0 && south < 64 && south%8 == square%8{// ! potential for overflow??
-            map |= 1 << south;
-        }
-        if east >= 0 && east < 64 && east/8 == square/8{// ! potential for overflow??
-            map |= 1 << east;
-        }
-        if west >= 0 && west < 64 && west/8 == square/8{// ! potential for overflow??
-            map |= 1 << west;
-        }
-        i+=1;
-    }
-    map
-}
-
-pub const ROOK_ATTACK_MAPS:[u64; 64] = {
-    let mut rook_attack_maps:[u64; 64] = [0; 64];
-    let mut i = 0;
-    while i < 64{
-        rook_attack_maps[i] = rook_attack_map_for_square(i as i32);
-        i+=1;
-    }
-    rook_attack_maps
-};
 
 pub struct RookMoves{
 
@@ -123,42 +88,9 @@ impl RookMoves{
     }
 }
 
-//BISHOP
-const fn bishop_attack_map_for_square(square:i32) -> u64{
-    let mut map:u64 = 0;
-    let mut i = 1;
-    while i < 8{
-        let northeast = square+9*i;
-        let northewest = square+7*i;
-        let southeast = square-7*i;
-        let southwest = square-9*i;
-        if (northeast%8 - square%8).abs() == (northeast/8 - square/8).abs() && northeast >= 0 && northeast < 64{
-            map |= 1 << northeast;
-        }
-        if (northewest%8 - square%8).abs() == (northewest/8 - square/8).abs() && northewest >= 0 && northewest < 64{
-            map |= 1 << northewest;
-        }
-        if (southeast%8 - square%8).abs() == (southeast/8 - square/8).abs() && southeast >= 0 && southeast < 64{
-            map |= 1 << southeast;
-        }
-        if (southwest%8 - square%8).abs() == (southwest/8 - square/8).abs() && southwest >= 0 && southwest < 64{
-            map |= 1 << southwest;
-        }
-        i+=1;
-    }
-    map
-}
 
 
-pub const BISHOP_ATTACK_MAPS:[u64; 64] = {
-    let mut bishop_attack_map:[u64; 64] = [0; 64];
-    let mut i = 0;
-    while i < 64{
-        bishop_attack_map[i] = bishop_attack_map_for_square(i as i32);
-        i+=1;
-    }
-    bishop_attack_map
-};
+
 
 pub struct BishopMoves{
 
@@ -300,7 +232,7 @@ pub const KNIGHT_MOVES:[u64; 64] = {
 
 
 //help functions
-pub fn pop_LSB(d_word:&mut u64) -> usize{
+pub fn pop_lsb(d_word:&mut u64) -> usize{
     let index = u64::trailing_zeros(*d_word);
     *d_word ^= 1 << index;
     return index as usize;
@@ -405,6 +337,7 @@ pub fn populate_bishop_moves(){
     }
 }
 
+#[inline(always)]
 fn magic_index(blockers: u64, entry:&MagicEntry) -> usize{
     let mut hash = blockers & entry.mask;
     hash = hash.wrapping_mul(entry.magic) >> entry.shift;
@@ -413,3 +346,5 @@ fn magic_index(blockers: u64, entry:&MagicEntry) -> usize{
 
 
 pub const BOARD_CENTER:u64 = 0x00003c3c3c3c0000;
+
+

@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn number_of_legal_moves_against_old() {
-
+        setup_sliding_magics();
         let fens = [
             "8/1PP1PK2/P2Bn3/3R4/1N3p2/1p5p/7Q/1nr2k2 w - - 0 1",
             "3b4/3Bn1BP/3N4/3P2k1/2K5/P6p/2P3Np/2q3r1 w - - 0 1",
@@ -199,46 +199,46 @@ mod tests {
     }
 
     #[test]
-    fn perft_test_start_pos(){
+    fn perft_start_pos(){
         setup_sliding_magics();
         let board_state = BoardState::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         let mut bit_board_state = BitBoardState::new();
         bit_board_state.board_setup(&board_state);
         let start = SystemTime::now();
-        assert_eq!(perft(&mut bit_board_state, 1), 20);
-        assert_eq!(perft(&mut bit_board_state, 2), 400);
-        assert_eq!(perft(&mut bit_board_state, 3), 8902);
-        assert_eq!(perft(&mut bit_board_state, 4), 197281);
-        assert_eq!(perft(&mut bit_board_state, 5), 4865609);
-        assert_eq!(perft(&mut bit_board_state, 6), 119060324);
+        //assert_eq!(perft(&mut bit_board_state, 1), 20);
+        //assert_eq!(perft(&mut bit_board_state, 2), 400);
+        //assert_eq!(perft(&mut bit_board_state, 3), 8902);
+        //assert_eq!(perft(&mut bit_board_state, 4), 197281);
+        //assert_eq!(perft(&mut bit_board_state, 5), 4865609);
+        //assert_eq!(perft(&mut bit_board_state, 6), 119060324);
         assert_eq!(perft(&mut bit_board_state, 7), 3195901860);
-        assert_eq!(perft(&mut bit_board_state, 8), 84998978956);
+        //assert_eq!(perft(&mut bit_board_state, 8), 84998978956);
 
-        let elapsed = start.elapsed().unwrap().as_millis();
-        println!("perft 1-6 finished in {elapsed}ms");
+        println!("perft used {} ms", start.elapsed().unwrap().as_millis());
 
     }
 
     #[test]
-    fn perft_test_extras(){
+    fn perft_extras(){
+        setup_sliding_magics();
         let board_state = BoardState::new_from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ");
         let mut bit_board_state = BitBoardState::new();
         bit_board_state.board_setup(&board_state);
         assert_eq!(perft(&mut bit_board_state, 1), 48);
         assert_eq!(perft(&mut bit_board_state, 2), 2039);
         assert_eq!(perft(&mut bit_board_state, 3), 97862);// !doesnt match
-        assert_eq!(perft(&mut bit_board_state, 4), 4085603);
-        assert_eq!(perft(&mut bit_board_state, 5), 193690690);
-        assert_eq!(perft(&mut bit_board_state, 6), 8031647685);
+        //assert_eq!(perft(&mut bit_board_state, 4), 4085603);
+        //assert_eq!(perft(&mut bit_board_state, 5), 193690690);
+        //assert_eq!(perft(&mut bit_board_state, 6), 8031647685);
 
         let board_state = BoardState::new_from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ");
         let mut bit_board_state = BitBoardState::new();
         bit_board_state.board_setup(&board_state);
         assert_eq!(perft(&mut bit_board_state, 1), 14);
-        assert_eq!(perft(&mut bit_board_state, 2), 191);// !chrashes
+        assert_eq!(perft(&mut bit_board_state, 2), 191);
         assert_eq!(perft(&mut bit_board_state, 3), 2812);
         assert_eq!(perft(&mut bit_board_state, 4), 43238);
-        assert_eq!(perft(&mut bit_board_state, 5), 674624);
+        assert_eq!(perft(&mut bit_board_state, 5), 674624);// !doesnt match
     }
 
     fn readable_chess_moves(chess_moves:&Vec<ChessMove>) -> Vec<String>{

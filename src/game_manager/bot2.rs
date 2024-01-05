@@ -20,24 +20,24 @@ pub struct Bot2{
     search_depth: i64,
     max_depth: usize,
     num_pos: usize,
-    table: HashMap<(BoardStateNumbers, usize), f64, BuildHasherDefault<FxHasher>>
+    table: HashMap<(BoardStateNumbers, usize), i32, BuildHasherDefault<FxHasher>>
 }
 
 
 impl Bot for Bot2{
     fn new() -> Self{
         Self{
-            search_depth: 5,
-            max_depth: 5,
+            search_depth: 6,
+            max_depth: 20,
             num_pos: 0,
-            table: HashMap::<(BoardStateNumbers, usize), f64, BuildHasherDefault<FxHasher>>::default()
+            table: HashMap::<(BoardStateNumbers, usize), i32, BuildHasherDefault<FxHasher>>::default()
         }
     }
 
     fn get_move(&mut self, mut board_state:BoardState) -> GetMoveResult{
         let mut bit_board_state = BitBoardState::new();
         bit_board_state.board_setup(&board_state);
-        let search_result = self.search(&mut bit_board_state, self.search_depth, f64::MIN, f64::MAX, 0, true);
+        let search_result = self.search(&mut bit_board_state, self.search_depth, i32::MIN, i32::MAX, 0, true);
         return GetMoveResult::new(
             search_result.1,
             self.num_pos,
@@ -48,44 +48,44 @@ impl Bot for Bot2{
 
 impl Bot2 {
 
-    fn promising_move(&self, bit_board_state:&mut BitBoardState, chess_move: &ChessMove) -> f64{
-        let mut promising_level = 0.0;
+    fn promising_move(&self, bit_board_state:&mut BitBoardState, chess_move: &ChessMove) -> i32{
+        let mut promising_level = 0;
 
         let origin_value = bit_board_state.piece_value(chess_move.origin() as usize);
         let target_value = bit_board_state.piece_value(chess_move.target() as usize);
 
-        let color_value = if origin_value < 0.0 {-1.0} else {1.0}; //Note that origin square is never 0
+        let color_value = if origin_value < 0 {-1} else {1}; //Note that origin square is never no piece
 
         match chess_move.flag(){
             NO_FLAG => {
-                promising_level += - target_value - origin_value;
+                promising_level += -target_value*10;
             }
             DOUBLE_PAWN_MOVE => {
-                promising_level += 1.0*color_value;
+                promising_level += 10*color_value;
             }
             W_CASTLE_KING | W_CASTLE_QUEEN => {
-                promising_level += 1.0;
+                promising_level += 10;
             }
             B_CASTLE_KING | B_CASTLE_QUEEN => {
-                promising_level += -1.0;
+                promising_level += -10;
             }
             WHITE_EN_PASSANT => {
-                promising_level += 2.0;
+                promising_level += 20;
             }
             BLACK_EN_PASSANT => {
-                promising_level += -2.0;
+                promising_level += -20;
             }
             PROMOTE_TO_KNIGHT => {
-                promising_level += 0.4*color_value - target_value;
+                promising_level += 4*color_value - target_value;
             }
             PROMOTE_TO_BISHOP => {
-                promising_level += 0.2*color_value - target_value;
+                promising_level += 2*color_value - target_value;
             }
             PROMOTE_TO_ROOK => {
-                promising_level += 0.2*color_value - target_value;
+                promising_level += 2*color_value - target_value;
             }
             PROMOTE_TO_QUEEN => {
-                promising_level += 9.0*color_value - target_value;
+                promising_level += 90*color_value - target_value;
             }
             _ => {println!("INVALID MOVE FLAG")}
         }
@@ -93,10 +93,10 @@ impl Bot2 {
         return promising_level;
     }
     
-    fn evaluate(&mut self, bit_board_state:&mut BitBoardState) -> f64{
+    fn evaluate(&mut self, bit_board_state:&mut BitBoardState) -> i32{
 
         self.num_pos += 1;
-        let mut eval:f64 = 0.0;
+        let mut eval:i32 = 0;
 
 
         //eval += (fastrand::f64() - 0.5)*0.001;
@@ -104,15 +104,15 @@ impl Bot2 {
         let to_move = if bit_board_state.white_to_move() {1} else {0};
         let other = if to_move == 1 {0} else {1};
 
-        eval+=((bit_board_state.knights_in_center(1)-bit_board_state.knights_in_center(0)) as f64) * 0.3;
+        eval+=((bit_board_state.knights_in_center(1)-bit_board_state.knights_in_center(0))) * 30;
 
-        eval+=bit_board_state.piece_count();
+        eval+=bit_board_state.piece_count()*100;
 
 
         return eval;
     }
 
-    fn search(&mut self, mut bit_board_state:&mut BitBoardState, depth:i64, mut alpha:f64, mut beta:f64, true_depth:usize, first: bool) -> (f64, ChessMove){
+    fn search(&mut self, mut bit_board_state:&mut BitBoardState, depth:i64, mut alpha:i32, mut beta:i32, true_depth:usize, first: bool) -> (i32, ChessMove){
 
         if !first { //No transpositions are possible for the first move
             if let Some(eval) = self.table.get(&(bit_board_state.board_state_numbers(), true_depth)){
@@ -124,9 +124,9 @@ impl Bot2 {
 
         let game_state = bit_board_state.game_state();
         match game_state{
-            GameState::Black => {return (f64::MIN, ChessMove::new_empty())}
-            GameState::White => {return (f64::MAX, ChessMove::new_empty())}
-            GameState::Draw => {return (0.0, ChessMove::new_empty())}
+            GameState::Black => {return (i32::MIN, ChessMove::new_empty())}
+            GameState::White => {return (i32::MAX, ChessMove::new_empty())}
+            GameState::Draw => {return (0, ChessMove::new_empty())}
             GameState::Playing => {}
         }
 
@@ -137,8 +137,8 @@ impl Bot2 {
         let mut moves = bit_board_state.gen_moves_legal().moves_vec();
 
         
-        let mut min:f64 = f64::MAX;
-        let mut max:f64 = f64::MIN;
+        let mut min:i32 = i32::MAX;
+        let mut max:i32 = i32::MIN;
 
 
         if bit_board_state.white_to_move() {
@@ -163,8 +163,9 @@ impl Bot2 {
 
             //Maybe maybe not
             let mut extension = 0;
-            if bit_board_state.piece_value(chess_move.target() as usize) != 0.0 && depth == 1{
-                extension = 1;
+
+            if bit_board_state.piece_value(chess_move.target() as usize) != 0 && depth == 1{
+                extension = std::cmp::max(1, extension);
             }
 
             //check captured piece //?Implement later if needed
@@ -224,7 +225,7 @@ impl Clone for Bot2{
             search_depth: self.search_depth,
             max_depth: self.max_depth,
             num_pos: self.num_pos,
-            table: HashMap::<(BoardStateNumbers, usize), f64, BuildHasherDefault<FxHasher>>::default()
+            table: HashMap::<(BoardStateNumbers, usize), i32, BuildHasherDefault<FxHasher>>::default()
         }
     }
 }

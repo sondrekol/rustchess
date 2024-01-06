@@ -22,5 +22,13 @@ mod tests{
     }
 
 
+    #[test]
+    fn best_line_test(){
+        let fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+        let mut bot2 = Bot2::new();
+        bot2.get_move(BoardState::new_from_fen(fen));
+    }
+
+
     
 }

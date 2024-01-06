@@ -3,6 +3,7 @@
 
 #[cfg(test)]
 mod tests {
+    use core::num;
     use std::alloc::System;
     use std::str::Bytes;
     use std::time::SystemTime;
@@ -226,10 +227,10 @@ mod tests {
         bit_board_state.board_setup(&board_state);
         assert_eq!(perft(&mut bit_board_state, 1), 48);
         assert_eq!(perft(&mut bit_board_state, 2), 2039);
-        assert_eq!(perft(&mut bit_board_state, 3), 97862);// !doesnt match
-        //assert_eq!(perft(&mut bit_board_state, 4), 4085603);
-        //assert_eq!(perft(&mut bit_board_state, 5), 193690690);
-        //assert_eq!(perft(&mut bit_board_state, 6), 8031647685);
+        assert_eq!(perft(&mut bit_board_state, 3), 97862);
+        assert_eq!(perft(&mut bit_board_state, 4), 4085603);
+        assert_eq!(perft(&mut bit_board_state, 5), 193690690);
+        assert_eq!(perft(&mut bit_board_state, 6), 8031647685);
 
         let board_state = BoardState::new_from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ");
         let mut bit_board_state = BitBoardState::new();
@@ -238,7 +239,29 @@ mod tests {
         assert_eq!(perft(&mut bit_board_state, 2), 191);
         assert_eq!(perft(&mut bit_board_state, 3), 2812);
         assert_eq!(perft(&mut bit_board_state, 4), 43238);
-        assert_eq!(perft(&mut bit_board_state, 5), 674624);// !doesnt match
+        assert_eq!(perft(&mut bit_board_state, 5), 674624);
+
+        
+
+        let board_state = BoardState::new_from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
+        let mut bit_board_state = BitBoardState::new();
+        bit_board_state.board_setup(&board_state);
+        assert_eq!(perft(&mut bit_board_state, 1), 6);
+        assert_eq!(perft(&mut bit_board_state, 2), 264);
+        assert_eq!(perft(&mut bit_board_state, 3), 9467);
+        assert_eq!(perft(&mut bit_board_state, 4), 422333);
+        assert_eq!(perft(&mut bit_board_state, 5), 15833292);
+        assert_eq!(perft(&mut bit_board_state, 6), 706045033);
+
+        let board_state = BoardState::new_from_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8 ");
+        let mut bit_board_state = BitBoardState::new();
+        bit_board_state.board_setup(&board_state);
+        assert_eq!(perft(&mut bit_board_state, 1), 44);
+        assert_eq!(perft(&mut bit_board_state, 2), 1486);
+        assert_eq!(perft(&mut bit_board_state, 3), 62379);
+        assert_eq!(perft(&mut bit_board_state, 4), 2103487);
+        assert_eq!(perft(&mut bit_board_state, 5), 89941194);
+
     }
 
     fn readable_chess_moves(chess_moves:&Vec<ChessMove>) -> Vec<String>{
@@ -256,25 +279,28 @@ mod tests {
         }
         else if depth == 1 {
             let number_of_moves = bit_board_state.gen_moves_legal().size();
-            let readable_moves = readable_chess_moves(&bit_board_state.gen_moves_legal().moves_vec());
             return number_of_moves;
         }
         else {
             let mut sum = 0;
             for chess_move in bit_board_state.gen_moves_legal().moves_vec(){
-                sum += perft_verbose(&mut bit_board_state.perform_move(chess_move), depth-1);
+                println!("{}: ", move_string_short(&chess_move));
+                let number_of_moves = perft(&mut bit_board_state.perform_move(chess_move), depth-1);
+                println!("{}", number_of_moves);
+                sum += number_of_moves;
+
             }
             return sum;
         }
     }
 
     #[test]
-    fn perft_test_verbose(){
-        let board_state = BoardState::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    fn perft_verbose_test(){
+        setup_sliding_magics();
+        let board_state = BoardState::new_from_fen("8/4k3/3P4/1N6/4R3/8/3K4/8 b - - 0 1");
         let mut bit_board_state = BitBoardState::new();
         bit_board_state.board_setup(&board_state);
-        assert_eq!(perft_verbose(&mut bit_board_state, 1), 20);
-        assert_eq!(perft_verbose(&mut bit_board_state, 2), 400);
+        assert_eq!(perft_verbose(&mut bit_board_state, 2), 1815);// !doesnt match
     }
 
     #[test]
@@ -291,6 +317,35 @@ mod tests {
     }
 
     #[test]
+    fn perft_test_single(){
+        setup_sliding_magics();
+        let fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/Np2P3/5Q1p/PPPBBPPP/R3K2R b KQkq - 1 1";
+        let board_state = BoardState::new_from_fen(fen);
+        let mut bit_board_state = BitBoardState::new();
+        bit_board_state.board_setup(&board_state);
+        assert_eq!(perft_verbose(&mut bit_board_state.perform_move(ChessMove::new_exact(0b0110000000000000)), 1), 53);
+    }
+
+    #[test]
+    fn perform_move_test2(){
+        let fen = "8/2p5/3p4/1P5r/1K3p2/6k1/4P1P1/1R6 b - - 3 2";
+        let board_state = BoardState::new_from_fen(fen);
+        let mut bit_board_state = BitBoardState::new();
+        bit_board_state.board_setup(&board_state);
+        let chess_move = ChessMove::from_indices(0b1111, 22, 31);
+        let bit_board_state_performed = bit_board_state.perform_move(chess_move);
+
+        let fen = "8/2p5/3p4/1P5r/1K3p1k/8/4P1P1/1R6 w - - 4 3";
+        let board_state = BoardState::new_from_fen(fen);
+        let mut bit_board_state_exact = BitBoardState::new();
+        bit_board_state_exact.board_setup(&board_state);
+
+        println!("{}",move_string_short(&chess_move));
+        println!("stop here");
+        
+    }
+
+    #[test]
     fn game_state_test(){
         let board_state = BoardState::new_from_fen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 1 1");
         let mut bit_board_state = BitBoardState::new();
@@ -304,6 +359,10 @@ mod tests {
             }
         }
         println!("{}", start.elapsed().unwrap().as_millis());
+    }
+
+    fn move_string_short(chess_move:&ChessMove) -> String{
+        return format!("{}{} f({})", string_square(chess_move.origin()), string_square(chess_move.target()), chess_move.flag()); 
     }
 
 }

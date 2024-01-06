@@ -8,12 +8,12 @@ pub mod bit_boards;
 mod bit_boards_tests;
 
 //Piece indexes
-const PAWN:usize = 0;
-const KNIGHT:usize = 1;
-const BISHOP:usize = 2;
-const ROOK:usize = 3;
-const QUEEN:usize = 4;
-const KING:usize = 5;
+pub const PAWN:usize = 0;
+pub const KNIGHT:usize = 1;
+pub const BISHOP:usize = 2;
+pub const ROOK:usize = 3;
+pub const QUEEN:usize = 4;
+pub const KING:usize = 5;
 
 //Castle Rights
 const WHITE_CASTLE_KING: u8 = 0b00000001;
@@ -22,8 +22,8 @@ const BLACK_CASTLE_KING: u8 = 0b00000100;
 const BLACK_CASTLE_QUEEN: u8 = 0b00001000;
 
 //Color define
-const WHITE: usize = 1;
-const BLACK: usize = 0;
+pub const WHITE: usize = 1;
+pub const BLACK: usize = 0;
 
 //en passant
 const NO_EN_PASSANT_SQUARE:usize = 0x80;
@@ -69,6 +69,7 @@ pub struct BoardStateNumbers{
 pub struct BitBoardState{
     //Board state
     piece_bb: [[u64; 6];2],
+    color_mask: [u64; 2], //indexed by color, return a bitboard of pieces with said color
     to_move: usize,
     other: usize,
     en_passant_square: usize,
@@ -83,7 +84,6 @@ pub struct BitBoardState{
     legal_moves_calculated: bool,
 
     //helpers
-    color_mask: [u64; 2], //indexed by color, return a bitboard of pieces with said color
     checkers: u64, //bitboard containing the current checkers
     check_line: u64, //line bitboard of checkline if king is checked by sliding piece
     pinned_pieces: u64, //bitboard containing all pinned pieces
@@ -253,8 +253,8 @@ impl BitBoardState{
 
             self.generate_moves_target_masked(pawn, normal_moves, 0b1111, mask);
             if (1 << normal_move) & (self.color_mask[self.to_move] | self.color_mask[self.other]) == 0{
-                let double_pawn_offset = (-16 + 32*self.to_move as i32) as i32; //Hacky as fuck, but may help branch predictor
-                let double_move = (1 << double_pawn_offset) & !(self.color_mask[self.to_move] | self.color_mask[self.other]);
+                let double_pawn_square = if self.to_move == WHITE {pawn + 16} else {pawn-16}; //Hacky as fuck, but may help branch predictor
+                let double_move = 1 << (double_pawn_square) & !(self.color_mask[self.to_move] | self.color_mask[self.other]);
                 self.generate_moves_target_masked(pawn, double_move, 0b1010, mask);
             }
         }
@@ -324,14 +324,23 @@ impl BitBoardState{
         let king_pos = u64::trailing_zeros(self.piece_bb[self.to_move][KING]) as usize;
         let moves_bb = bit_boards::KING_MOVES[king_pos] & !(self.color_mask[self.to_move]);
 
-        let towards_check = moves_bb & self.check_line; //should return the one and only move that will move towards the checking piece 
-        let offset = u64::trailing_zeros(towards_check) as i32 - king_pos as i32; //return the offset of towards_check move
-        let opposite_offset = king_pos as i32 - offset; //uses the offset to calculate position of away_from_check
+        let mut towards_check = moves_bb & self.check_line;
+        let offset1 = bit_boards::pop_lsb(&mut towards_check) as i32 - king_pos as i32;
+        let opposite_offset1 = king_pos as i32 - offset1;
 
         
-        let away_from_check:u64 = if opposite_offset >= 0 && opposite_offset < 64 {
-                                        1 << opposite_offset
-                                    }else {0};
+        let mut away_from_check:u64 = if opposite_offset1 >= 0 && opposite_offset1 < 64 {
+                                        1 << opposite_offset1
+                                    }else {0}; //add first opposite offset
+                                
+        if towards_check != 0 {
+            let offset2 = bit_boards::pop_lsb(&mut towards_check) as i32 - king_pos as i32;
+            let opposite_offset2 = king_pos as i32 - offset2; //in the case of single checking sliding piece this will be 0
+            away_from_check |= if opposite_offset2 >= 0 && opposite_offset2 < 64 {
+                                        1 << opposite_offset2
+                                    }else {0}; //add second opposite offset
+        }
+        
         self.generate_moves_for_king(king_pos, moves_bb & !away_from_check, 0b1111);
 
 
@@ -488,7 +497,7 @@ impl BitBoardState{
                 }
                 //if there is no piece between king and attack, then king is checked trough this line
                 else if u64::count_ones(own_pieces_on_path) == 0{
-                    self.check_line = rookmoves;
+                    self.check_line |= rookmoves;
                 }
             }
         }
@@ -505,13 +514,13 @@ impl BitBoardState{
                 }
                 //if there is no piece between king and attack, then king is checked trough this line
                 else if u64::count_ones(own_pieces_on_path) == 0{
-                    self.check_line = bishopmoves;
+                    self.check_line |= bishopmoves;
                 }
             }
         }
     }
 
-    fn attackers(&mut self, pos: usize) -> u64{
+    fn attackers(&self, pos: usize) -> u64{
 
         //Count rook attackers
         let rook_moves_bb = bit_boards::RookMoves::mov_map(
@@ -572,7 +581,18 @@ impl BitBoardState{
             1 => {
                 if self.check_line == 0 {
                     self.legal_king_moves();
-                    self.legal_moves(!self.checkers); //happens if knight check, in which case non king moves must capture the knight
+                    self.legal_moves(!self.checkers); //happens if knight or pawn check, in which case non king moves must capture the pawn
+
+                     //if there is a pawn checking, and en passant possible then you should also generate the up to 2 legal en passant moves
+                    if self.en_passant_possible && self.piece_bb[self.other][PAWN] & self.checkers != 0{
+                        let mut pawns = self.piece_bb[self.to_move][PAWN];
+                        while pawns != 0 {
+                            let pawn = bit_boards::pop_lsb(&mut pawns);
+                            let capture_targets = bit_boards::PAWN_CAPTURES[self.to_move][pawn];
+                            let en_passant_capture = capture_targets & (1 << self.en_passant_square);
+                            self.generate_en_passant(pawn, en_passant_capture);
+                        }
+                    }
                 }else{
                     self.legal_evading_king_moves();
                     self.legal_moves(!self.check_line); //Generate only moves blocking check, or capturing checking piece
@@ -593,16 +613,16 @@ impl BitBoardState{
     
     pub fn piece_count(&self) -> i32{
         return 
-         (u64::count_ones(self.piece_bb[WHITE][PAWN]) as i32)*1
-        +(u64::count_ones(self.piece_bb[WHITE][KNIGHT]) as i32)*3
-        +(u64::count_ones(self.piece_bb[WHITE][BISHOP]) as i32)*3
-        +(u64::count_ones(self.piece_bb[WHITE][ROOK]) as i32)*5
-        +(u64::count_ones(self.piece_bb[WHITE][QUEEN]) as i32)*9
-        -(u64::count_ones(self.piece_bb[BLACK][PAWN]) as i32)*1
-        -(u64::count_ones(self.piece_bb[BLACK][KNIGHT]) as i32)*3
-        -(u64::count_ones(self.piece_bb[BLACK][BISHOP]) as i32)*3
-        -(u64::count_ones(self.piece_bb[BLACK][ROOK]) as i32)*5
-        -(u64::count_ones(self.piece_bb[BLACK][QUEEN]) as i32)*9;
+         (u64::count_ones(self.piece_bb[WHITE][PAWN]) as i32)*10
+        +(u64::count_ones(self.piece_bb[WHITE][KNIGHT]) as i32)*30
+        +(u64::count_ones(self.piece_bb[WHITE][BISHOP]) as i32)*35
+        +(u64::count_ones(self.piece_bb[WHITE][ROOK]) as i32)*50
+        +(u64::count_ones(self.piece_bb[WHITE][QUEEN]) as i32)*90
+        -(u64::count_ones(self.piece_bb[BLACK][PAWN]) as i32)*10
+        -(u64::count_ones(self.piece_bb[BLACK][KNIGHT]) as i32)*30
+        -(u64::count_ones(self.piece_bb[BLACK][BISHOP]) as i32)*35
+        -(u64::count_ones(self.piece_bb[BLACK][ROOK]) as i32)*50
+        -(u64::count_ones(self.piece_bb[BLACK][QUEEN]) as i32)*90;
         
     }
     pub fn update_state(&mut self){
@@ -627,7 +647,7 @@ impl BitBoardState{
         let mut new_castle_w_k: bool = self.castle_w_k;
         let mut new_castle_w_q: bool = self.castle_w_q;
         let mut new_castle_b_k: bool = self.castle_b_k;
-        let mut new_castle_b_q: bool = self.castle_b_k;
+        let mut new_castle_b_q: bool = self.castle_b_q;
 
         let mut move_piece = ||{
             //get which piece is being moved
@@ -680,21 +700,29 @@ impl BitBoardState{
                 new_piece_bb[BLACK][KING] = 1 << 58; //overwrite king bb with new position
                 new_piece_bb[BLACK][ROOK] &= !(1 << 56); //remove corner rook
                 new_piece_bb[BLACK][ROOK] |= 1 << 59; //add new rook position
+                new_castle_b_k = false;
+                new_castle_b_q = false;
             }
             B_CASTLE_KING => {
                 new_piece_bb[BLACK][KING] = 1 << 62; //overwrite king bb with new position
                 new_piece_bb[BLACK][ROOK] &= !(1 << 63); //remove corner rook
                 new_piece_bb[BLACK][ROOK] |= 1 << 61; //add new rook position
+                new_castle_b_k = false;
+                new_castle_b_q = false;
             }
             W_CASTLE_QUEEN => {
                 new_piece_bb[WHITE][KING] = 1 << 2; //overwrite king bb with new position
                 new_piece_bb[WHITE][ROOK] &= !(1 << 0); //remove corner rook
                 new_piece_bb[WHITE][ROOK] |= 1 << 3; //add new rook position
+                new_castle_w_k = false;
+                new_castle_w_q = false;
             }
             W_CASTLE_KING => {
                 new_piece_bb[WHITE][KING] = 1 << 6; //overwrite king bb with new position
                 new_piece_bb[WHITE][ROOK] &= !(1 << 7); //remove corner rook
                 new_piece_bb[WHITE][ROOK] |= 1 << 5; //add new rook position
+                new_castle_w_k = false;
+                new_castle_w_q = false;
             }
             PROMOTE_TO_QUEEN => {
                 new_piece_bb[self.to_move][PAWN] &= !origin_bb;
@@ -745,22 +773,24 @@ impl BitBoardState{
             }
         }
 
-        const WHITE_KING_CASTLE_PIECES:u64 = (1 << 4) | (1 << 0);
-        const WHITE_QUEEN_CASTLE_PIECES:u64 = (1 << 4) | (1 << 7);
-        const BLACK_KING_CASTLE_PIECES:u64 = (1 << 60) | (1 << 54);
-        const BLACK_QUEEN_CASTLE_PIECES:u64 = (1 << 60) | (1 << 63);
+        const WHITE_KING_CASTLE_PIECES:u64 = (1 << 4) | (1 << 7);
+        const WHITE_QUEEN_CASTLE_PIECES:u64 = (1 << 4) | (1 << 0);
+        const BLACK_KING_CASTLE_PIECES:u64 = (1 << 60) | (1 << 63);
+        const BLACK_QUEEN_CASTLE_PIECES:u64 = (1 << 60) | (1 << 56);
         
-        if WHITE_KING_CASTLE_PIECES & (origin_bb | target_bb) != 0{
-            new_castle_w_k = false;
-        }
-        if WHITE_QUEEN_CASTLE_PIECES & (origin_bb | target_bb) != 0{
-            new_castle_w_q = false;
-        }
-        if BLACK_KING_CASTLE_PIECES & (origin_bb | target_bb) != 0{
-            new_castle_b_k = false;
-        }
-        if BLACK_QUEEN_CASTLE_PIECES & (origin_bb | target_bb) != 0{
-            new_castle_b_q = false;
+        if flag != W_CASTLE_KING && flag != B_CASTLE_KING && flag != W_CASTLE_QUEEN && flag != B_CASTLE_QUEEN{
+            if WHITE_KING_CASTLE_PIECES & (origin_bb | target_bb) != 0{
+                new_castle_w_k = false;
+            }
+            if WHITE_QUEEN_CASTLE_PIECES & (origin_bb | target_bb) != 0{
+                new_castle_w_q = false;
+            }
+            if BLACK_KING_CASTLE_PIECES & (origin_bb | target_bb) != 0{
+                new_castle_b_k = false;
+            }
+            if BLACK_QUEEN_CASTLE_PIECES & (origin_bb | target_bb) != 0{
+                new_castle_b_q = false;
+            }
         }
 
         if flag != DOUBLE_PAWN_MOVE {
@@ -816,16 +846,16 @@ impl BitBoardState{
         assert!(square < 64);
         let mask = 1 << square;
         return 
-         (u64::count_ones(self.piece_bb[WHITE][PAWN] & mask) as i32)*1
-        +(u64::count_ones(self.piece_bb[WHITE][KNIGHT] & mask) as i32)*3
-        +(u64::count_ones(self.piece_bb[WHITE][BISHOP] & mask) as i32)*3
-        +(u64::count_ones(self.piece_bb[WHITE][ROOK] & mask) as i32)*5
-        +(u64::count_ones(self.piece_bb[WHITE][QUEEN] & mask) as i32)*9
-        -(u64::count_ones(self.piece_bb[BLACK][PAWN] & mask) as i32)*1
-        -(u64::count_ones(self.piece_bb[BLACK][KNIGHT] & mask) as i32)*3
-        -(u64::count_ones(self.piece_bb[BLACK][BISHOP] & mask) as i32)*3
-        -(u64::count_ones(self.piece_bb[BLACK][ROOK] & mask) as i32)*5
-        -(u64::count_ones(self.piece_bb[BLACK][QUEEN] & mask) as i32)*9;
+         (u64::count_ones(self.piece_bb[WHITE][PAWN] & mask) as i32)*10
+        +(u64::count_ones(self.piece_bb[WHITE][KNIGHT] & mask) as i32)*30
+        +(u64::count_ones(self.piece_bb[WHITE][BISHOP] & mask) as i32)*35
+        +(u64::count_ones(self.piece_bb[WHITE][ROOK] & mask) as i32)*50
+        +(u64::count_ones(self.piece_bb[WHITE][QUEEN] & mask) as i32)*90
+        -(u64::count_ones(self.piece_bb[BLACK][PAWN] & mask) as i32)*10
+        -(u64::count_ones(self.piece_bb[BLACK][KNIGHT] & mask) as i32)*30
+        -(u64::count_ones(self.piece_bb[BLACK][BISHOP] & mask) as i32)*35
+        -(u64::count_ones(self.piece_bb[BLACK][ROOK] & mask) as i32)*50
+        -(u64::count_ones(self.piece_bb[BLACK][QUEEN] & mask) as i32)*90;
     }
 
     pub fn game_state(&mut self) -> GameState{
@@ -850,7 +880,7 @@ impl BitBoardState{
             self.legal_king_moves();
             let legal_king_moves = self.legal_moves.size_fast();
             self.legal_moves.reset();
-            if legal_king_moves >= 2 { 
+            if legal_king_moves >= 3 { 
                 return GameState::Playing;
             }
         }
@@ -898,6 +928,38 @@ impl BitBoardState{
 
     pub fn knights_in_center(&self, color: usize) -> i32{
         return u64::count_ones(self.piece_bb[color][KNIGHT] & BOARD_CENTER) as i32;
+    }
+
+    //returns the map of attackers for color, color=BLACK will return blacks attackers on the square
+    fn get_attackers_for_color(&mut self, square: usize, color:usize) -> u64{
+        let mut attackers:u64 = 0;
+        if color != self.to_move{
+            attackers = self.attackers(square);
+        }else{
+            self.other = self.to_move;
+            self.to_move = color;
+            attackers = self.attackers(square);
+            self.to_move = self.other;
+            self.other = color;
+        }
+        return attackers;
+    }
+
+    //returns the absolute value of the least worth piece controlling a square
+    pub fn least_valuable_controller(&mut self, square: usize, color:usize) -> i32{
+        let attackers:u64 = self.get_attackers_for_color(square, color);
+        if attackers & self.piece_bb[color][PAWN] != 0{return 10}
+        if attackers & self.piece_bb[color][KNIGHT] != 0{return 30}
+        if attackers & self.piece_bb[color][BISHOP] != 0{return 35}
+        if attackers & self.piece_bb[color][ROOK] != 0{return 50}
+        if attackers & self.piece_bb[color][QUEEN] != 0{return 90}
+        if attackers & self.piece_bb[color][KING] != 0{return 150}
+        return 0; //return some high value 
+    }
+
+    //returns mask of all pieces on the board
+    pub fn piece_mask(&self) -> u64{
+        return self.color_mask[WHITE] | self.color_mask[BLACK];
     }
 }
 

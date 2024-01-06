@@ -44,6 +44,7 @@ impl GameManager{
             if let Some(new_board_state) = self.board_state.perform_move_api(origin, target, promotion_piece){
                 self.board_state = new_board_state;
                 self.turn = !self.turn;
+                println!("player played: {} to {}", origin, target);
             }
         }
     }
@@ -80,8 +81,12 @@ impl GameManager{
                     println!("Bot finished with move: origin: {}, target: {}, flag:{}", get_move_result.chess_move().origin(), get_move_result.chess_move().target(), get_move_result.chess_move().flag());
                     println!("time elapsed: {}", used_time);
                     println!("evaluated {} positions", get_move_result.num_pos());
-                    println!("eval: {}", get_move_result.eval());
-                    println!("{} kN/s", get_move_result.num_pos()/used_time as usize);
+                    println!("eval: {}", (get_move_result.eval() as f64)/100.0);
+                    if used_time != 0 {
+
+                        println!("{} kN/s", get_move_result.num_pos()/used_time as usize);
+                    }
+                    println!("average index of best move: {}", get_move_result.avg_best_move_i());
                     println!();
                     self.board_state = self.board_state.perform_move(*get_move_result.chess_move());
                     self.turn = !self.turn;

@@ -12,6 +12,17 @@ pub const RANK_6:u64 = RANK_1 << 40;
 pub const RANK_7:u64 = RANK_1 << 48;
 pub const RANK_8:u64 = RANK_1 << 56;
 
+pub const RANKS:[u64; 8] = [
+    RANK_1,
+    RANK_2,
+    RANK_3,
+    RANK_4,
+    RANK_5,
+    RANK_6,
+    RANK_7,
+    RANK_8
+];
+
 pub const FILE_A:u64 = 0x0101010101010101;
 pub const FILE_B:u64 = FILE_A << 1;
 pub const FILE_C:u64 = FILE_A << 2;
@@ -20,6 +31,17 @@ pub const FILE_E:u64 = FILE_A << 4;
 pub const FILE_F:u64 = FILE_A << 5;
 pub const FILE_G:u64 = FILE_A << 6;
 pub const FILE_H:u64 = FILE_A << 7;
+
+pub const FILES:[u64; 8] = [
+    FILE_A,
+    FILE_B,
+    FILE_C,
+    FILE_D,
+    FILE_E,
+    FILE_F,
+    FILE_E,
+    FILE_G
+];
 
 pub const EAST_OF:[u64; 8] = [ //Indexed by file
     FILE_A | FILE_B | FILE_C | FILE_D | FILE_E | FILE_F | FILE_G | FILE_H,
@@ -286,6 +308,17 @@ pub fn west_of(square:usize) -> u64{
     WEST_OF[square%8]
 }
 
+#[inline(always)]
+pub fn file_of(square: usize) -> u64{
+    return FILES[square%8];
+}
+
+#[inline(always)]
+pub fn rank_of(square: usize) -> u64{
+    return RANKS[square/8];
+}
+
+
 static mut ROOK_MOVES:[u64; ROOK_MAP_SIZE] = [0;ROOK_MAP_SIZE];
 
 
@@ -348,3 +381,23 @@ fn magic_index(blockers: u64, entry:&MagicEntry) -> usize{
 pub const BOARD_CENTER:u64 = 0x00003c3c3c3c0000;
 
 
+pub const TOP_TIER_PAWN:[u64; 2] = [
+    0xe7001818000000,
+    0x181800e700
+];
+
+pub const SEC_TIER_PAWN:[u64; 2] = [
+    0xdb8100180000,
+    0x180081db0000
+];
+
+
+pub const TOP_TIER_BISHOP:[u64; 2] = [
+    0x8142241818244281,
+    0x8142241818244281
+];
+
+pub const SEC_TIER_BISHOP:[u64; 2] = [
+    0x24422424422400,
+    0x24422424422400
+];

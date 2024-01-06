@@ -100,7 +100,7 @@ pub enum GameState{
 
 pub struct ChessMove{
     move_data:u16,
-    promising_level:i32
+    promising_level:i16
 }
 
 pub struct ChessMoveList{
@@ -193,11 +193,11 @@ impl ChessMove{
         return self.move_data;
     }
 
-    pub fn promising_level_mut(&mut self) -> &mut i32{
+    pub fn promising_level_mut(&mut self) -> &mut i16{
         return &mut self.promising_level;
     }
 
-    pub fn promising_level(&self) -> &i32{
+    pub fn promising_level(&self) -> &i16{
         return &self.promising_level;
     }
 

@@ -21,7 +21,7 @@ pub struct Bot2{
     search_depth: i64,
     max_depth: usize,
     num_pos: usize,
-    table: HashMap<(BoardStateNumbers, usize), i32, BuildHasherDefault<FxHasher>>,
+    table: HashMap<BoardStateNumbers, ChessMove, BuildHasherDefault<FxHasher>>,
     start_time: SystemTime,
     average_best_move_index: f64,
     average_best_move_index_count: u64,
@@ -36,7 +36,7 @@ impl Bot for Bot2{
             search_depth: SEARCH_DEPTH,
             max_depth: MAX_DEPTH,
             num_pos: 0,
-            table: HashMap::<(BoardStateNumbers, usize), i32, BuildHasherDefault<FxHasher>>::default(),
+            table: HashMap::<BoardStateNumbers, ChessMove, BuildHasherDefault<FxHasher>>::default(),
             start_time: SystemTime::now(),
             average_best_move_index: 0.0,
             average_best_move_index_count: 0,
@@ -56,7 +56,7 @@ impl Bot for Bot2{
         for i in 2..self.search_depth+1{
             self.num_pos = 0;
             let search_result = self.search(&mut bit_board_state, i, i32::MIN, i32::MAX, 0, true, &mut best_line);
-            self.table.clear();
+            //self.table.clear();
             best_move = search_result.1;
             best_eval = search_result.0;
             self.best_line = best_line.clone();
@@ -128,10 +128,19 @@ impl Bot2 {
         let color_value = if origin_value < 0 {-1} else {1}; //Note that origin square is never no piece
         let other_value = if color_value == 1 {-1} else {1};
 
-        if self.best_line[ply] == *chess_move{
+        /*if self.best_line[ply] == *chess_move{
             let promising_level_ref = chess_move.promising_level_mut();
             *promising_level_ref = 30000*color_value as i16;
             return;
+        }*/
+
+        //If there is allready a calculated best move for this position, one should probaly search that first
+        if let Some(previous_best) = self.table.get(&bit_board_state.board_state_numbers()){
+            if chess_move == previous_best {
+                let promising_level_ref = chess_move.promising_level_mut();
+                *promising_level_ref = 30000*color_value as i16;
+                return;
+            }
         }
 
         match chess_move.flag(){
@@ -250,11 +259,6 @@ impl Bot2 {
 
     fn search(&mut self, mut bit_board_state:&mut BitBoardState, depth:i64, mut alpha:i32, mut beta:i32, true_depth:usize, first: bool, best_line:& mut [ChessMove; MAX_DEPTH]) -> (i32, ChessMove){
 
-        if !first { //No transpositions are possible for the first move
-            if let Some(eval) = self.table.get(&(bit_board_state.board_state_numbers(), true_depth)){
-                return (*eval, ChessMove::new_empty());
-            }
-        }
 
 
 
@@ -368,16 +372,20 @@ impl Bot2 {
         self.average_best_move_index_count += 1;
         self.average_best_move_index += (best_move_index as f64 - self.average_best_move_index)/self.average_best_move_index_count as f64;
 
-        let eval = if bit_board_state.white_to_move() {max} else {min};
 
-        if depth >= 1{
-            self.table.insert((bit_board_state.board_state_numbers(), true_depth), eval);
-            self.table.shrink_to(TABLE_SIZE);
-        }
+
 
         if bit_board_state.white_to_move(){
+            if depth >= 1{
+                self.table.insert(bit_board_state.board_state_numbers(), max_move);
+                self.table.shrink_to(TABLE_SIZE);
+            }
             return (max, max_move);
         }else{
+            if depth >= 1{
+                self.table.insert(bit_board_state.board_state_numbers(), min_move);
+                self.table.shrink_to(TABLE_SIZE);
+            }
             return (min, min_move);
         }
     }
@@ -390,7 +398,7 @@ impl Clone for Bot2{
             search_depth: self.search_depth,
             max_depth: self.max_depth,
             num_pos: self.num_pos,
-            table: HashMap::<(BoardStateNumbers, usize), i32, BuildHasherDefault<FxHasher>>::default(),
+            table: HashMap::<BoardStateNumbers, ChessMove, BuildHasherDefault<FxHasher>>::default(),
             start_time: SystemTime::now(),
             average_best_move_index: 0.0,
             average_best_move_index_count: 0,

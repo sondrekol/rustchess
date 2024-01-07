@@ -14,14 +14,14 @@ extern crate fxhash;
 use fxhash::FxHasher;
 
 const DEFAULT_TABLE_SIZE:usize = 1000000;
-const DEFAULT_SEARCH_DEPTH:i64 = 10;
-const DEFAULT_MAX_DEPTH:usize = 12;
+const DEFAULT_SEARCH_DEPTH:i64 = 7;
+const DEFAULT_MAX_DEPTH:usize = 8;
 
 pub struct Bot2{
     search_depth: i64,
     max_depth: usize,
     num_pos: usize,
-    table: HashMap<BoardStateNumbers, ChessMove, BuildHasherDefault<FxHasher>>,
+    table: HashMap<(BoardStateNumbers, ChessMove), i32, BuildHasherDefault<FxHasher>>,
     table_size: usize,
     start_time: SystemTime,
     average_best_move_placement: f64,
@@ -37,7 +37,7 @@ impl Bot for Bot2{
             search_depth: DEFAULT_SEARCH_DEPTH,
             max_depth: DEFAULT_MAX_DEPTH,
             num_pos: 0,
-            table: HashMap::<BoardStateNumbers, ChessMove, BuildHasherDefault<FxHasher>>::default(),
+            table: HashMap::<(BoardStateNumbers, ChessMove), i32, BuildHasherDefault<FxHasher>>::default(),
             table_size: DEFAULT_TABLE_SIZE,
             start_time: SystemTime::now(),
             average_best_move_placement: 0.0,
@@ -51,7 +51,7 @@ impl Bot for Bot2{
             search_depth: search_depth,
             max_depth: max_depth,
             num_pos: 0,
-            table: HashMap::<BoardStateNumbers, ChessMove, BuildHasherDefault<FxHasher>>::default(),
+            table: HashMap::<(BoardStateNumbers, ChessMove), i32, BuildHasherDefault<FxHasher>>::default(),
             table_size: table_size,
             start_time: SystemTime::now(),
             average_best_move_placement: 0.0,
@@ -133,7 +133,7 @@ impl Bot2 {
             return false;
         }
     }
-    fn promising_move(&self, bit_board_state:&mut BitBoardState, chess_move: &mut ChessMove, ply: usize, previous_best:Option<&ChessMove>){
+    fn promising_move(&self, bit_board_state:&mut BitBoardState, chess_move: &mut ChessMove, ply: usize){
 
         let mut promising_level = 0;
         
@@ -155,12 +155,18 @@ impl Bot2 {
         }*/
 
         //If there is allready a calculated best move for this position, one should probaly search that first
-        if let Some(best_move) = previous_best{
+        /*if let Some(best_move) = previous_best{
             if *chess_move == *best_move {
                 let promising_level_ref = chess_move.promising_level_mut();
                 *promising_level_ref = 30000*color_value as i16;
                 return;
             }
+        }*/
+
+        if let Some(eval) = self.table.get(&(bit_board_state.board_state_numbers(), *chess_move)){
+            let promising_level_ref = chess_move.promising_level_mut();
+            *promising_level_ref = 5000*color_value as i16 + *eval as i16;
+            return;
         }
 
         match chess_move.flag(){
@@ -334,10 +340,8 @@ impl Bot2 {
         let mut min:i32 = i32::MAX;
         let mut max:i32 = i32::MIN;
 
-        let previous_best = self.table.get(&bit_board_state.board_state_numbers());
-
         for i in 0..moves.len(){
-            self.promising_move(bit_board_state, &mut moves[i], true_depth, previous_best);
+            self.promising_move(bit_board_state, &mut moves[i], true_depth);
         }
 
 
@@ -386,6 +390,9 @@ impl Bot2 {
                     max = result.0;
                     max_move = chess_move;
                     best_move_placement = move_placement as f64/move_count;
+                    if self.table.len() < self.table_size {
+                        self.table.insert((bit_board_state.board_state_numbers(), max_move), max);
+                    }
                 }
             }
             
@@ -394,6 +401,9 @@ impl Bot2 {
                     min = result.0;
                     min_move = chess_move;
                     best_move_placement = move_placement as f64/move_count;
+                    if self.table.len() < self.table_size {
+                        self.table.insert((bit_board_state.board_state_numbers(), min_move), min);
+                    }
                 }
 
             }
@@ -431,18 +441,8 @@ impl Bot2 {
 
         match_history.pop();
         if bit_board_state.white_to_move(){
-            if depth >= 1{
-                if self.table.len() < self.table_size {
-                    self.table.insert(bit_board_state.board_state_numbers(), max_move);
-                }
-            }
             return (max, max_move);
         }else{
-            if depth >= 1{
-                if self.table.len() < self.table_size {
-                    self.table.insert(bit_board_state.board_state_numbers(), min_move);
-                }
-            }
             return (min, min_move);
         }
     }
@@ -455,7 +455,7 @@ impl Clone for Bot2{
             search_depth: self.search_depth,
             max_depth: self.max_depth,
             num_pos: self.num_pos,
-            table: HashMap::<BoardStateNumbers, ChessMove, BuildHasherDefault<FxHasher>>::default(),
+            table: HashMap::<(BoardStateNumbers, ChessMove), i32, BuildHasherDefault<FxHasher>>::default(),
             table_size: self.table_size,
             start_time: SystemTime::now(),
             average_best_move_placement: 0.0,

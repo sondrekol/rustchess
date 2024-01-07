@@ -97,7 +97,7 @@ pub enum GameState{
 }
 
 
-
+#[derive(Hash)]
 pub struct ChessMove{
     move_data:u16,
     promising_level:i16
@@ -215,6 +215,8 @@ impl PartialEq for ChessMove {
     fn eq(&self, other: &Self) -> bool {
         self.move_data == other.move_data
     }
+}
+impl Eq for ChessMove {
 }
 
 impl ChessMoveList{

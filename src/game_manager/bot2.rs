@@ -7,65 +7,85 @@ use crate::game_manager::bot::Bot;
 
 use super::board2::{GameState, DOUBLE_PAWN_MOVE, W_CASTLE_KING, W_CASTLE_QUEEN, B_CASTLE_KING, B_CASTLE_QUEEN, WHITE_EN_PASSANT, BLACK_EN_PASSANT, PROMOTE_TO_KNIGHT, PROMOTE_TO_BISHOP, PROMOTE_TO_ROOK, PROMOTE_TO_QUEEN, NO_FLAG};
 use super::bot::GetMoveResult;
-use super::state_bitboard::bit_boards::{TOP_TIER_PAWN, SEC_TIER_PAWN, TOP_TIER_BISHOP, SEC_TIER_BISHOP, rank_of, pop_lsb, RookMoves, file_of, self};
-use super::state_bitboard::{BitBoardState, BoardStateNumbers, PAWN, WHITE, BLACK, BISHOP, ROOK, KING};
+use super::state_bitboard::bit_boards::{TOP_TIER_PAWN, SEC_TIER_PAWN, TOP_TIER_BISHOP, SEC_TIER_BISHOP, rank_of, pop_lsb, RookMoves, file_of, self, BOARD_CENTER};
+use super::state_bitboard::{BitBoardState, BoardStateNumbers, PAWN, WHITE, BLACK, BISHOP, ROOK, KING, KNIGHT};
 
 extern crate fxhash;
 use fxhash::FxHasher;
 
-const TABLE_SIZE:usize = 1000000;
-const SEARCH_DEPTH:i64 = 6;
-const MAX_DEPTH:usize = 16;
+const DEFAULT_TABLE_SIZE:usize = 1000000;
+const DEFAULT_SEARCH_DEPTH:i64 = 10;
+const DEFAULT_MAX_DEPTH:usize = 12;
 
 pub struct Bot2{
     search_depth: i64,
     max_depth: usize,
     num_pos: usize,
     table: HashMap<BoardStateNumbers, ChessMove, BuildHasherDefault<FxHasher>>,
+    table_size: usize,
     start_time: SystemTime,
-    average_best_move_index: f64,
-    average_best_move_index_count: u64,
-    best_line: [ChessMove; MAX_DEPTH]
+    average_best_move_placement: f64,
+    average_best_move_index_placement: u64,
+
 
 }
 
 
 impl Bot for Bot2{
-    fn new() -> Self{
+    fn default() -> Self{
         Self{
-            search_depth: SEARCH_DEPTH,
-            max_depth: MAX_DEPTH,
+            search_depth: DEFAULT_SEARCH_DEPTH,
+            max_depth: DEFAULT_MAX_DEPTH,
             num_pos: 0,
             table: HashMap::<BoardStateNumbers, ChessMove, BuildHasherDefault<FxHasher>>::default(),
+            table_size: DEFAULT_TABLE_SIZE,
             start_time: SystemTime::now(),
-            average_best_move_index: 0.0,
-            average_best_move_index_count: 0,
-            best_line: [ChessMove::new_empty(); MAX_DEPTH]
+            average_best_move_placement: 0.0,
+            average_best_move_index_placement: 0
             
         }
     }
 
-    fn get_move(&mut self, board_state:BoardState) -> GetMoveResult{
+    fn new(search_depth: i64, max_depth: usize, table_size: usize) -> Self{
+        Self{
+            search_depth: search_depth,
+            max_depth: max_depth,
+            num_pos: 0,
+            table: HashMap::<BoardStateNumbers, ChessMove, BuildHasherDefault<FxHasher>>::default(),
+            table_size: table_size,
+            start_time: SystemTime::now(),
+            average_best_move_placement: 0.0,
+            average_best_move_index_placement: 0
+            
+        }
+    }
+
+    fn get_move(&mut self, board_state:BoardState, match_history:&mut Vec<BoardStateNumbers>) -> GetMoveResult{
         self.start_time = SystemTime::now();
         let mut bit_board_state = BitBoardState::new();
         bit_board_state.board_setup(&board_state);
-        let mut best_line = self.best_line.clone();
 
+        return self.get_move_bb(bit_board_state, match_history);
+    }
+    fn get_move_bb(&mut self, board_state:BitBoardState, match_history:&mut Vec<BoardStateNumbers>) -> GetMoveResult{
+        self.start_time = SystemTime::now();
+
+        let mut bit_board_state = board_state;
         let mut best_move:ChessMove = ChessMove::new_empty();
         let mut best_eval:i32 = 0;
         for i in 2..self.search_depth+1{
             self.num_pos = 0;
-            let search_result = self.search(&mut bit_board_state, i, i32::MIN, i32::MAX, 0, true, &mut best_line);
+            let search_result = self.search(&mut bit_board_state, i, i32::MIN, i32::MAX, 0, true, match_history);
             //self.table.clear();
             best_move = search_result.1;
             best_eval = search_result.0;
-            self.best_line = best_line.clone();
         }
+
         return GetMoveResult::new(
             best_move,
             self.num_pos,
             best_eval,
-            self.average_best_move_index);
+            self.average_best_move_placement);
     }
 }
 
@@ -113,7 +133,7 @@ impl Bot2 {
             return false;
         }
     }
-    fn promising_move(&self, bit_board_state:&mut BitBoardState, chess_move: &mut ChessMove, ply: usize){
+    fn promising_move(&self, bit_board_state:&mut BitBoardState, chess_move: &mut ChessMove, ply: usize, previous_best:Option<&ChessMove>){
 
         let mut promising_level = 0;
         
@@ -135,8 +155,8 @@ impl Bot2 {
         }*/
 
         //If there is allready a calculated best move for this position, one should probaly search that first
-        if let Some(previous_best) = self.table.get(&bit_board_state.board_state_numbers()){
-            if chess_move == previous_best {
+        if let Some(best_move) = previous_best{
+            if *chess_move == *best_move {
                 let promising_level_ref = chess_move.promising_level_mut();
                 *promising_level_ref = 30000*color_value as i16;
                 return;
@@ -145,8 +165,32 @@ impl Bot2 {
 
         match chess_move.flag(){
             NO_FLAG => {
-                //let least_valuable_defender = bit_board_state.least_valuable_controller(chess_move.target() as usize, other)*other_value;
-                promising_level += -target_value*10; //add value of captured piece
+                if target_value != 0{ //is a capture
+                    /*
+                    capture of a rook will always come before capture of a knight,
+                    but capturing the rook with a pawn will come before capturing it with the queen
+                    
+                    
+                     */
+                    promising_level += -target_value*10; //add value of captured piece
+                    promising_level -= origin_value //subtract value/10 of capturing piece
+                }else{ // for non captures
+
+                    if origin_value == 10{
+                        promising_level += Bot2::pawn_placement_score(1 << target, WHITE);
+                        promising_level -= Bot2::pawn_placement_score(1 << origin, WHITE);
+                    }else if origin_value == -10{
+                        promising_level += Bot2::pawn_placement_score(1 << target, BLACK);
+                        promising_level -= Bot2::pawn_placement_score(1 << origin, BLACK);
+                    }else if origin_value == 30 || origin_value == -30{
+                        promising_level += Bot2::knight_placement_score(1 << target);
+                        promising_level -= Bot2::knight_placement_score(1 << origin);
+                    }
+                    else if origin_value == 35 || origin_value == -35{
+                        promising_level += Bot2::bishop_placement_score(1 << target, 0);
+                        promising_level -= Bot2::bishop_placement_score(1 << origin, 0);
+                    }
+                }
 
             }
             DOUBLE_PAWN_MOVE => {
@@ -165,7 +209,7 @@ impl Bot2 {
                 promising_level += -20;
             }
             PROMOTE_TO_KNIGHT => {
-                promising_level += 4*color_value - target_value;
+                promising_level += 10*color_value - target_value;
             }
             PROMOTE_TO_BISHOP => {
                 promising_level += 2*color_value - target_value;
@@ -185,6 +229,10 @@ impl Bot2 {
 
         let promising_level_ref = chess_move.promising_level_mut();
         *promising_level_ref = promising_level as i16;
+    }
+
+    fn knight_placement_score(knights:u64) -> i32{
+        return u64::count_ones(knights & BOARD_CENTER) as i32;
     }
 
     fn pawn_placement_score(pawns:u64, color:usize) -> i32{
@@ -241,23 +289,24 @@ impl Bot2 {
         eval+=bit_board_state.piece_count()*10;
 
 
-        eval+=((bit_board_state.knights_in_center(1)-bit_board_state.knights_in_center(0))) * 30; // ! move this function outside of bit_board_state
-
         eval += (Bot2::pawn_placement_score(pieces[WHITE][PAWN], WHITE) - 
                 Bot2::pawn_placement_score(pieces[BLACK][PAWN], BLACK))
                 *3;
+        eval += (Bot2::knight_placement_score(pieces[WHITE][KNIGHT]) -
+                Bot2::knight_placement_score(pieces[BLACK][KNIGHT]))
+                *5;
         eval += (Bot2::bishop_placement_score(pieces[WHITE][BISHOP], WHITE) -
                 Bot2::bishop_placement_score(pieces[BLACK][BISHOP], BLACK))
                 *15;
         eval += (Bot2::rook_score(pieces[WHITE][ROOK], pieces[WHITE][PAWN], piece_mask) -
                 Bot2::rook_score(pieces[BLACK][ROOK], pieces[BLACK][PAWN], piece_mask)
-                )*8;
+                )*20;
 
 
         return eval;
     }
 
-    fn search(&mut self, mut bit_board_state:&mut BitBoardState, depth:i64, mut alpha:i32, mut beta:i32, true_depth:usize, first: bool, best_line:& mut [ChessMove; MAX_DEPTH]) -> (i32, ChessMove){
+    fn search(&mut self, mut bit_board_state:&mut BitBoardState, depth:i64, mut alpha:i32, mut beta:i32, true_depth:usize, first: bool, match_history:&mut Vec<BoardStateNumbers>) -> (i32, ChessMove){
 
 
 
@@ -270,7 +319,12 @@ impl Bot2 {
             GameState::Playing => {}
         }
 
+        if match_history.iter().filter(|&n| *n == bit_board_state.board_state_numbers()).count() == 2{
+            return (0, ChessMove::new_empty()); 
+        }
+        match_history.push(bit_board_state.board_state_numbers());
         if depth <= 0 || true_depth >= self.max_depth{
+            match_history.pop();
             return (self.evaluate(bit_board_state), ChessMove::new_empty());
         }
 
@@ -280,8 +334,10 @@ impl Bot2 {
         let mut min:i32 = i32::MAX;
         let mut max:i32 = i32::MIN;
 
+        let previous_best = self.table.get(&bit_board_state.board_state_numbers());
+
         for i in 0..moves.len(){
-            self.promising_move(bit_board_state, &mut moves[i], true_depth);
+            self.promising_move(bit_board_state, &mut moves[i], true_depth, previous_best);
         }
 
 
@@ -302,17 +358,16 @@ impl Bot2 {
         let mut min_move:ChessMove = *moves.get(0).unwrap();
         let mut max_move:ChessMove = *moves.get(0).unwrap();
 
-        let mut move_index = 0;
-        let mut best_move_index = 0;
+        let mut move_placement = 0;
+        let mut best_move_placement: f64 = 0.0;
 
-        let mut best_line_clone = best_line.clone();
-
+        let move_count = moves.len() as f64;
         for chess_move in moves{
 
             //Maybe maybe not
             let mut extension = 0;
 
-            if move_index > 20{
+            if move_placement > 20{
                 extension -=1;
             }
 
@@ -323,23 +378,23 @@ impl Bot2 {
             
 
             
-            let result = self.search(&mut bit_board_state.perform_move(chess_move), depth-1+extension, alpha, beta, true_depth +1, false, &mut best_line_clone);
+            let result = self.search(&mut bit_board_state.perform_move(chess_move), depth-1+extension, alpha, beta, true_depth +1, false, match_history);
 
 
             if result.0 >= max{
-                max = result.0;
-                max_move = chess_move;
-                best_move_index = move_index;
-                *best_line = best_line_clone; // set up all follow up moves
-                best_line[true_depth] = chess_move;
-
+                if !(result.0 == 0 && max > -30){//dont go for draw in a roughly equal position
+                    max = result.0;
+                    max_move = chess_move;
+                    best_move_placement = move_placement as f64/move_count;
+                }
             }
+            
             if result.0 <= min{
-                min = result.0;
-                min_move = chess_move;
-                best_move_index = move_index;
-                *best_line = best_line_clone; // set up all follow up moves
-                best_line[true_depth] = chess_move;
+                if !(result.0 == 0 && min < 30){//dont go for draw in a roughly equal position
+                    min = result.0;
+                    min_move = chess_move;
+                    best_move_placement = move_placement as f64/move_count;
+                }
 
             }
 
@@ -363,28 +418,30 @@ impl Bot2 {
                 break;
             }
 
-            /*if self.start_time.elapsed().unwrap().as_millis() > 1000{
+            /*if self.start_time.elapsed().unwrap().as_millis() > 100{
                 break;
             }*/
 
-            move_index += 1;
+            move_placement += 1;
         }
-        self.average_best_move_index_count += 1;
-        self.average_best_move_index += (best_move_index as f64 - self.average_best_move_index)/self.average_best_move_index_count as f64;
+        self.average_best_move_index_placement += 1;
+        self.average_best_move_placement += (best_move_placement as f64 - self.average_best_move_placement)/self.average_best_move_index_placement as f64;
 
 
 
-
+        match_history.pop();
         if bit_board_state.white_to_move(){
             if depth >= 1{
-                self.table.insert(bit_board_state.board_state_numbers(), max_move);
-                self.table.shrink_to(TABLE_SIZE);
+                if self.table.len() < self.table_size {
+                    self.table.insert(bit_board_state.board_state_numbers(), max_move);
+                }
             }
             return (max, max_move);
         }else{
             if depth >= 1{
-                self.table.insert(bit_board_state.board_state_numbers(), min_move);
-                self.table.shrink_to(TABLE_SIZE);
+                if self.table.len() < self.table_size {
+                    self.table.insert(bit_board_state.board_state_numbers(), min_move);
+                }
             }
             return (min, min_move);
         }
@@ -399,10 +456,10 @@ impl Clone for Bot2{
             max_depth: self.max_depth,
             num_pos: self.num_pos,
             table: HashMap::<BoardStateNumbers, ChessMove, BuildHasherDefault<FxHasher>>::default(),
+            table_size: self.table_size,
             start_time: SystemTime::now(),
-            average_best_move_index: 0.0,
-            average_best_move_index_count: 0,
-            best_line: [ChessMove::new_empty(); MAX_DEPTH]
+            average_best_move_placement: 0.0,
+            average_best_move_index_placement: 0
         }
     }
 }

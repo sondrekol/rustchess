@@ -1,5 +1,7 @@
 use std::{thread::{self, JoinHandle}, ptr::null, time::SystemTime};
 
+use crate::game_manager::state_bitboard::BoardStateNumbers;
+
 use self::{board2::{BoardState, ChessMove},
 bot::{Bot, GetMoveResult}, 
 bot2::Bot2, 
@@ -12,6 +14,7 @@ mod bot2;
 mod bot2bench;
 mod state_bitboard;
 mod state_bitboard_tests;
+mod bot_evaluater;
 pub struct GameManager{
     player_color: bool,
     board_state: BoardState,
@@ -33,7 +36,7 @@ impl GameManager{
             player_color: color,
             turn: true,
             board_state: BoardState::new_from_fen(fen),
-            bot: Bot2::new(),
+            bot: Bot2::default(),
             bot_thread: None,
             bot_start_time: SystemTime::now()
         }
@@ -60,7 +63,7 @@ impl GameManager{
                 let bot = self.bot.clone();
 
                 self.bot_thread = Some(thread::spawn(move ||{
-                    return bot.clone().get_move(board_state);
+                    return bot.clone().get_move(board_state, &mut Vec::<BoardStateNumbers>::new());
                 }));
                 println!("Bot started");
                 println!("----------------");

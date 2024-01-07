@@ -209,7 +209,7 @@ fn main() {
 
         board_graphic_state: [[0; 8];8],
         
-        game_manager: GameManager::new_game(true, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+        game_manager: GameManager::new_game(false, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
         piece_in_hand: 0,
         mouse_position: [0.0, 0.0],
         board_size: 0.0,

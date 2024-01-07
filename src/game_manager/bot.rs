@@ -1,5 +1,5 @@
 use crate::game_manager::board2::BoardState;
-use super::board2::ChessMove;
+use super::{board2::ChessMove, state_bitboard::{BitBoardState, BoardStateNumbers}};
 
 
 pub struct GetMoveResult{
@@ -30,6 +30,9 @@ impl GetMoveResult{
 }
 
 pub trait Bot {
-    fn new() -> Self;
-    fn get_move(&mut self, board_state:BoardState) -> GetMoveResult;
+    fn default() -> Self;
+    fn new(search_depth: i64, max_depth: usize, table_size: usize) -> Self;
+    fn get_move(&mut self, board_state:BoardState, match_history:&mut Vec<BoardStateNumbers>) -> GetMoveResult;
+    fn get_move_bb(&mut self, board_state:BitBoardState, match_history:&mut Vec<BoardStateNumbers>) -> GetMoveResult;
+
 }

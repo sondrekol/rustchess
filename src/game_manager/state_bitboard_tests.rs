@@ -319,11 +319,11 @@ mod tests {
     #[test]
     fn perft_test_single(){
         setup_sliding_magics();
-        let fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/Np2P3/5Q1p/PPPBBPPP/R3K2R b KQkq - 1 1";
+        let fen = "r3q1kr/p1p2pbp/Qpb1pnp1/3p4/3P4/2B1PPP1/PPP3BP/RN2K2R w KQ - 75 54";
         let board_state = BoardState::new_from_fen(fen);
         let mut bit_board_state = BitBoardState::new();
         bit_board_state.board_setup(&board_state);
-        assert_eq!(perft_verbose(&mut bit_board_state.perform_move(ChessMove::new_exact(0b0110000000000000)), 1), 53);
+        assert_eq!(perft_verbose(&mut bit_board_state.perform_move(ChessMove::new_exact(0b0110000000000000)), 2), 53);
     }
 
     #[test]

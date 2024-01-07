@@ -22,7 +22,7 @@ pub struct Bot2{
     search_depth: i64,
     max_depth: usize,
     num_pos: usize,
-    table: HashMap<(BoardStateNumbers, ChessMove), i32, BuildHasherDefault<FxHasher>>,
+    table: HashMap<BoardStateNumbers, Vec<(ChessMove, i32)>, BuildHasherDefault<FxHasher>>,
     table_size: usize,
     start_time: SystemTime,
     average_best_move_placement: f64,
@@ -44,7 +44,7 @@ impl Bot for Bot2{
             search_depth: search_depth,
             max_depth: max_depth,
             num_pos: 0,
-            table: HashMap::<(BoardStateNumbers, ChessMove), i32, BuildHasherDefault<FxHasher>>::default(),
+            table: HashMap::<BoardStateNumbers, Vec<(ChessMove, i32)>, BuildHasherDefault<FxHasher>>::default(),
             table_size: table_size,
             start_time: SystemTime::now(),
             average_best_move_placement: 0.0,
@@ -132,7 +132,7 @@ impl Bot2 {
             return false;
         }
     }
-    fn promising_move(&self, bit_board_state:&mut BitBoardState, chess_move: &mut ChessMove, ply: usize){
+    fn promising_move(&self, bit_board_state:&mut BitBoardState, chess_move: &mut ChessMove, ply: usize, best_moves_option:Option<&Vec<(ChessMove, i32)>>){
 
         let mut promising_level = 0;
         
@@ -153,6 +153,15 @@ impl Bot2 {
             return;
         }*/
 
+        if let Some(best_moves) = best_moves_option{
+            for good_move in best_moves {
+                if *chess_move == good_move.0 {
+                    let promising_level_ref = chess_move.promising_level_mut();
+                    *promising_level_ref = 30000*color_value as i16 + good_move.1 as i16;
+                    return;
+                }
+            }
+        }
         //If there is allready a calculated best move for this position, one should probaly search that first
         /*if let Some(best_move) = previous_best{
             if *chess_move == *best_move {
@@ -161,12 +170,6 @@ impl Bot2 {
                 return;
             }
         }*/
-        let board_state_numbers = bit_board_state.board_state_numbers();
-        if let Some(eval) = self.table.get(&(board_state_numbers, *chess_move)){
-            let promising_level_ref = chess_move.promising_level_mut();
-            *promising_level_ref = 5000*color_value as i16 + *eval as i16;
-            return;
-        }
 
         match chess_move.flag(){
             NO_FLAG => {
@@ -336,28 +339,44 @@ impl Bot2 {
         let mut moves = bit_board_state.gen_moves_legal().moves_vec();
 
         
-        let mut min:i32 = i32::MAX;
-        let mut max:i32 = i32::MIN;
+        
 
+        let previous_best_moves = self.table.get(&board_state_numbers);
+
+        //add promising level to the moves for later sorting
         for i in 0..moves.len(){
-            self.promising_move(bit_board_state, &mut moves[i], true_depth);
+            self.promising_move(bit_board_state, &mut moves[i], true_depth, previous_best_moves);
         }
 
+        let previous_best_moves_mut = self.table.get_mut(&board_state_numbers);
+        
+        if previous_best_moves_mut.is_some(){
+            //clear the best moves, needs to be overwritten anyway
 
+            previous_best_moves_mut.unwrap().clear();
+
+        }else{
+            //if this is the first time seeing the position, insert a new vec for bestmoves
+            self.table.insert(board_state_numbers, Vec::<(ChessMove, i32)>::new());
+
+        }//at this point previous_best_moves_mut should contain an empty vec
+
+        //Sort moves by how promising they are
         if bit_board_state.white_to_move() {
             moves.sort_by(|a, b| 
                 a.promising_level()
                 .cmp(&b.promising_level())
                 .reverse()
                 )
-        }
-        else {
+        }else {
             moves.sort_by(|a, b| 
                 a.promising_level()
                 .cmp(&b.promising_level())
                 )
         };
-
+        
+        let mut min:i32 = i32::MAX;
+        let mut max:i32 = i32::MIN;
         let mut min_move:ChessMove = *moves.get(0).unwrap();
         let mut max_move:ChessMove = *moves.get(0).unwrap();
 
@@ -404,9 +423,7 @@ impl Bot2 {
                     max = result.0;
                     max_move = chess_move;
                     best_move_placement = move_placement as f64/move_count;
-                    if self.table.len() < self.table_size {
-                        self.table.insert((board_state_numbers, max_move), max);
-                    }
+                    self.table.get_mut(&board_state_numbers).unwrap().push((max_move, max));
                 }
             }
 
@@ -423,9 +440,7 @@ impl Bot2 {
                     min = result.0;
                     min_move = chess_move;
                     best_move_placement = move_placement as f64/move_count;
-                    if self.table.len() < self.table_size {
-                        self.table.insert((board_state_numbers, min_move), min);
-                    }
+                    self.table.get_mut(&board_state_numbers).unwrap().push((min_move, min));
                 }
 
             }
@@ -479,7 +494,7 @@ impl Clone for Bot2{
             search_depth: self.search_depth,
             max_depth: self.max_depth,
             num_pos: self.num_pos,
-            table: HashMap::<(BoardStateNumbers, ChessMove), i32, BuildHasherDefault<FxHasher>>::default(),
+            table: HashMap::<BoardStateNumbers, Vec<(ChessMove, i32)>, BuildHasherDefault<FxHasher>>::default(),
             table_size: self.table_size,
             start_time: SystemTime::now(),
             average_best_move_placement: 0.0,

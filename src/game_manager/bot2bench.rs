@@ -28,7 +28,7 @@ mod tests{
         let mut avg_best_move_index:f64 = 0.0;
         let mut avg_nodes_searched:f64 = 0.0;
         for fen in fens{
-                let mut bot2 = Bot2::default();
+                let mut bot2 = Bot2::new(7, 8, 1000000, None);
                 let start_time = SystemTime::now();
 
                 let results:GetMoveResult = bot2.get_move(BoardState::new_from_fen(fen), &mut Vec::<BoardStateNumbers>::new());

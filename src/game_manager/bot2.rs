@@ -14,8 +14,9 @@ extern crate fxhash;
 use fxhash::FxHasher;
 
 const DEFAULT_TABLE_SIZE:usize = 1000000;
-const DEFAULT_SEARCH_DEPTH:i64 = 7;
-const DEFAULT_MAX_DEPTH:usize = 8;
+const DEFAULT_SEARCH_DEPTH:i64 = 6;
+const DEFAULT_MAX_DEPTH:usize = 7;
+const DEFAULT_MAX_TIME:Option<u128> = None;
 
 pub struct Bot2{
     search_depth: i64,
@@ -26,7 +27,8 @@ pub struct Bot2{
     start_time: SystemTime,
     average_best_move_placement: f64,
     average_best_move_index_placement: u64,
-    search_stopped: bool
+    search_stopped: bool,
+    max_time: Option<u128>
 
 
 }
@@ -34,10 +36,10 @@ pub struct Bot2{
 
 impl Bot for Bot2{
     fn default() -> Self{
-        return Bot2::new(DEFAULT_SEARCH_DEPTH, DEFAULT_MAX_DEPTH, DEFAULT_TABLE_SIZE);
+        return Bot2::new(DEFAULT_SEARCH_DEPTH, DEFAULT_MAX_DEPTH, DEFAULT_TABLE_SIZE, DEFAULT_MAX_TIME);
     }
 
-    fn new(search_depth: i64, max_depth: usize, table_size: usize) -> Self{
+    fn new(search_depth: i64, max_depth: usize, table_size: usize, max_time: Option<u128>) -> Self{
         Self{
             search_depth: search_depth,
             max_depth: max_depth,
@@ -47,7 +49,8 @@ impl Bot for Bot2{
             start_time: SystemTime::now(),
             average_best_move_placement: 0.0,
             average_best_move_index_placement: 0,
-            search_stopped: false
+            search_stopped: false,
+            max_time: max_time
             
         }
     }
@@ -158,8 +161,8 @@ impl Bot2 {
                 return;
             }
         }*/
-
-        if let Some(eval) = self.table.get(&(bit_board_state.board_state_numbers(), *chess_move)){
+        let board_state_numbers = bit_board_state.board_state_numbers();
+        if let Some(eval) = self.table.get(&(board_state_numbers, *chess_move)){
             let promising_level_ref = chess_move.promising_level_mut();
             *promising_level_ref = 5000*color_value as i16 + *eval as i16;
             return;
@@ -320,11 +323,11 @@ impl Bot2 {
             GameState::Draw => {return (0, ChessMove::new_empty())}
             GameState::Playing => {}
         }
-
-        if match_history.iter().filter(|&n| *n == bit_board_state.board_state_numbers()).count() == 2{
+        let board_state_numbers = bit_board_state.board_state_numbers();
+        if match_history.iter().filter(|&n| *n == board_state_numbers).count() == 2{
             return (0, ChessMove::new_empty()); 
         }
-        match_history.push(bit_board_state.board_state_numbers());
+        match_history.push(board_state_numbers);
         
         if depth <= 0 || true_depth >= self.max_depth{
             match_history.pop();
@@ -368,15 +371,14 @@ impl Bot2 {
             let mut extension = 0;
             let mut lazy = false;
 
-            if (move_placement as f64)/move_count > 0.3 && move_count > 9.0 && depth > 3{
+
+            if (move_placement as f64)/move_count > 0.7 && move_count > 9.0 && depth > 3{
                 extension -=1;
                 lazy = true;
-
             }
-            if (move_placement as f64)/move_count > 0.6 && move_count > 9.0 && depth > 3{
+            if (move_placement as f64)/move_count > 0.8 && move_count > 9.0 && depth > 3{
                 extension -=1;
                 lazy = true;
-
             }
 
             if bit_board_state.piece_value(chess_move.target() as usize) != 0 && depth == 1{
@@ -402,6 +404,9 @@ impl Bot2 {
                     max = result.0;
                     max_move = chess_move;
                     best_move_placement = move_placement as f64/move_count;
+                    if self.table.len() < self.table_size {
+                        self.table.insert((board_state_numbers, max_move), max);
+                    }
                 }
             }
 
@@ -419,7 +424,7 @@ impl Bot2 {
                     min_move = chess_move;
                     best_move_placement = move_placement as f64/move_count;
                     if self.table.len() < self.table_size {
-                        self.table.insert((bit_board_state.board_state_numbers(), min_move), min);
+                        self.table.insert((board_state_numbers, min_move), min);
                     }
                 }
 
@@ -444,10 +449,11 @@ impl Bot2 {
                 //Killer move! opponent does not want to see this move be played
                 break;
             }
-
-            if self.start_time.elapsed().unwrap().as_millis() > 2000{
-                self.search_stopped = true;
-                break;
+            if let Some(max_time) = self.max_time{
+                if self.start_time.elapsed().unwrap().as_millis() > max_time{
+                    self.search_stopped = true;
+                    break;
+                }
             }
 
             move_placement += 1;
@@ -478,7 +484,8 @@ impl Clone for Bot2{
             start_time: SystemTime::now(),
             average_best_move_placement: 0.0,
             average_best_move_index_placement: 0,
-            search_stopped: false
+            search_stopped: false,
+            max_time: self.max_time
         }
     }
 }

@@ -31,7 +31,7 @@ impl GetMoveResult{
 
 pub trait Bot {
     fn default() -> Self;
-    fn new(search_depth: i64, max_depth: usize, table_size: usize) -> Self;
+    fn new(search_depth: i64, max_depth: usize, table_size: usize, max_time: Option<u128>) -> Self;
     fn get_move(&mut self, board_state:BoardState, match_history:&mut Vec<BoardStateNumbers>) -> GetMoveResult;
     fn get_move_bb(&mut self, board_state:BitBoardState, match_history:&mut Vec<BoardStateNumbers>) -> GetMoveResult;
 

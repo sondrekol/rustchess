@@ -15,6 +15,8 @@ mod bot2bench;
 mod state_bitboard;
 mod state_bitboard_tests;
 mod bot_evaluater;
+mod transposition_table;
+
 pub struct GameManager{
     player_color: bool,
     board_state: BoardState,

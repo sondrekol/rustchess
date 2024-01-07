@@ -51,7 +51,7 @@ const NO_FLAG:u8 = 0b1111;
 
 
 //smaller state used for transposition table
-#[derive(Hash, PartialEq, Eq)]
+#[derive(Hash, PartialEq, Eq, Clone, Copy)]
 pub struct BoardStateNumbers{
     piece_bb: [u64; 6],
     piece_bb_color: [u64; 2],
@@ -877,11 +877,14 @@ impl BitBoardState{
         }
         //check for only king moves, this does not need to precompute anything
         else{
-            self.legal_king_moves();
-            let legal_king_moves = self.legal_moves.size_fast();
-            self.legal_moves.reset();
-            if legal_king_moves >= 3 { 
-                return GameState::Playing;
+            if self.num_checkers() == 0{
+
+                self.legal_king_moves();
+                let legal_king_moves = self.legal_moves.size_fast();
+                self.legal_moves.reset();
+                if legal_king_moves >= 1 { 
+                    return GameState::Playing;
+                }
             }
         }
         //finally if all else fails, do a full search of all moves to check if there are 0 legal moves

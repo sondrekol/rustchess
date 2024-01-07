@@ -14,8 +14,8 @@ extern crate fxhash;
 use fxhash::FxHasher;
 
 const DEFAULT_TABLE_SIZE:usize = 1000000;
-const DEFAULT_SEARCH_DEPTH:i64 = 10;
-const DEFAULT_MAX_DEPTH:usize = 12;
+const DEFAULT_SEARCH_DEPTH:i64 = 7;
+const DEFAULT_MAX_DEPTH:usize = 8;
 
 pub struct Bot2{
     search_depth: i64,

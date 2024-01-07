@@ -1,5 +1,5 @@
 
-
+use std::hash::{Hash, Hasher};
 
 
 
@@ -97,12 +97,15 @@ pub enum GameState{
 }
 
 
-#[derive(Hash)]
 pub struct ChessMove{
     move_data:u16,
     promising_level:i16
 }
-
+impl Hash for ChessMove{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.move_data.hash(state);
+    }
+}
 pub struct ChessMoveList{
     index: u8,
     chess_moves: [ChessMove; 218]

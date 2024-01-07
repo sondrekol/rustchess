@@ -4,7 +4,7 @@ const TABLE_SIZE:usize = 1048576;//2^20
 const TABLE_SET_SIZE:u8 = 8;
 
 struct Entry{
-    key: u64,
+    key: u64, //zobrist hash of 
     value: i32
 }
 

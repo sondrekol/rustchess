@@ -42,6 +42,7 @@ mod tests{
        println!(" average time for best move: {}", average_time);
        println!("average best move placement: {}", avg_best_move_index);
        println!("     average nodes searched: {}", avg_nodes_searched);
+       println!("                       kN/s: {}", avg_nodes_searched/average_time as f64);
        println!("-----------------------------------------------");
        println!();
     }

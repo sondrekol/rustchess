@@ -353,7 +353,7 @@ impl Bot2 {
         if previous_best_moves_mut.is_some(){
             //clear the best moves, needs to be overwritten anyway
 
-            previous_best_moves_mut.unwrap().clear();
+            //previous_best_moves_mut.unwrap().clear(); // !try: overwrite values directly, such that best moves in depth 4 but not 5 are used for ordering in depth 6
 
         }else{
             //if this is the first time seeing the position, insert a new vec for bestmoves
@@ -423,8 +423,22 @@ impl Bot2 {
                     max = result.0;
                     max_move = chess_move;
                     best_move_placement = move_placement as f64/move_count;
-                    self.table.get_mut(&board_state_numbers).unwrap().push((max_move, max));
+                    
+                    //replace or add best move
+                    let best_moves = self.table.get_mut(&board_state_numbers).unwrap();
+                    let mut found_move: bool = false;
+                    for i in 0..best_moves.len(){
+                        if max_move == best_moves[i].0{
+                            best_moves[i].1 = max;
+                            found_move = true;
+                            break;
+                        }
+                    }
+                    if !found_move{
+                        self.table.get_mut(&board_state_numbers).unwrap().push((max_move, max));
+                    }
                 }
+                
             }
 
             if lazy && result.0 <= min{
@@ -440,7 +454,20 @@ impl Bot2 {
                     min = result.0;
                     min_move = chess_move;
                     best_move_placement = move_placement as f64/move_count;
-                    self.table.get_mut(&board_state_numbers).unwrap().push((min_move, min));
+
+                    //replace or add best move
+                    let best_moves = self.table.get_mut(&board_state_numbers).unwrap();
+                    let mut found_move: bool = false;
+                    for i in 0..best_moves.len(){
+                        if min_move == best_moves[i].0{
+                            best_moves[i].1 = min;
+                            found_move = true;
+                            break;
+                        }
+                    }
+                    if !found_move{
+                        self.table.get_mut(&board_state_numbers).unwrap().push((min_move, min));
+                    }
                 }
 
             }

@@ -109,8 +109,8 @@ mod tests{
     fn bot_comparer(){
         bit_boards::populate_rook_moves();
         bit_boards::populate_bishop_moves();
-        let mut bot1 = Bot2::new(5, 6, 1000000);
-        let mut bot2 = Bot2::new(5, 6, 1000000);
+        let mut bot1 = Bot2::new(7, 9, 1000000);
+        let mut bot2 = Bot2::new(7, 9, 1000000);
 
         let (result, game_string) = play_match(bot1, bot2);
         match result {

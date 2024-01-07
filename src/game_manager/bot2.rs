@@ -26,6 +26,7 @@ pub struct Bot2{
     start_time: SystemTime,
     average_best_move_placement: f64,
     average_best_move_index_placement: u64,
+    search_stopped: bool
 
 
 }
@@ -33,17 +34,7 @@ pub struct Bot2{
 
 impl Bot for Bot2{
     fn default() -> Self{
-        Self{
-            search_depth: DEFAULT_SEARCH_DEPTH,
-            max_depth: DEFAULT_MAX_DEPTH,
-            num_pos: 0,
-            table: HashMap::<(BoardStateNumbers, ChessMove), i32, BuildHasherDefault<FxHasher>>::default(),
-            table_size: DEFAULT_TABLE_SIZE,
-            start_time: SystemTime::now(),
-            average_best_move_placement: 0.0,
-            average_best_move_index_placement: 0
-            
-        }
+        return Bot2::new(DEFAULT_SEARCH_DEPTH, DEFAULT_MAX_DEPTH, DEFAULT_TABLE_SIZE);
     }
 
     fn new(search_depth: i64, max_depth: usize, table_size: usize) -> Self{
@@ -55,7 +46,8 @@ impl Bot for Bot2{
             table_size: table_size,
             start_time: SystemTime::now(),
             average_best_move_placement: 0.0,
-            average_best_move_index_placement: 0
+            average_best_move_index_placement: 0,
+            search_stopped: false
             
         }
     }
@@ -77,6 +69,10 @@ impl Bot for Bot2{
             self.num_pos = 0;
             let search_result = self.search(&mut bit_board_state, i, i32::MIN, i32::MAX, 0, true, match_history);
             //self.table.clear();
+            if self.search_stopped {
+                println!("stopped at depth: {i}");
+                break;
+            }
             best_move = search_result.1;
             best_eval = search_result.0;
         }
@@ -329,11 +325,11 @@ impl Bot2 {
             return (0, ChessMove::new_empty()); 
         }
         match_history.push(bit_board_state.board_state_numbers());
+        
         if depth <= 0 || true_depth >= self.max_depth{
             match_history.pop();
             return (self.evaluate(bit_board_state), ChessMove::new_empty());
         }
-
         let mut moves = bit_board_state.gen_moves_legal().moves_vec();
 
         
@@ -370,9 +366,17 @@ impl Bot2 {
 
             //Maybe maybe not
             let mut extension = 0;
+            let mut lazy = false;
 
-            if move_placement > 20{
+            if (move_placement as f64)/move_count > 0.3 && move_count > 9.0 && depth > 3{
                 extension -=1;
+                lazy = true;
+
+            }
+            if (move_placement as f64)/move_count > 0.6 && move_count > 9.0 && depth > 3{
+                extension -=1;
+                lazy = true;
+
             }
 
             if bit_board_state.piece_value(chess_move.target() as usize) != 0 && depth == 1{
@@ -382,18 +386,31 @@ impl Bot2 {
             
 
             
-            let result = self.search(&mut bit_board_state.perform_move(chess_move), depth-1+extension, alpha, beta, true_depth +1, false, match_history);
+            let mut result = self.search(&mut bit_board_state.perform_move(chess_move), depth-1+extension, alpha, beta, true_depth +1, false, match_history);
 
+            if lazy && result.0 >= max{
+                extension = 0;
+                if bit_board_state.piece_value(chess_move.target() as usize) != 0 && depth == 1{
+                    extension = std::cmp::max(1, extension);
+                }
+                result = self.search(&mut bit_board_state.perform_move(chess_move), depth-1+extension, alpha, beta, true_depth +1, false, match_history);
+            }
 
             if result.0 >= max{
+                
                 if !(result.0 == 0 && max > -30){//dont go for draw in a roughly equal position
                     max = result.0;
                     max_move = chess_move;
                     best_move_placement = move_placement as f64/move_count;
-                    if self.table.len() < self.table_size {
-                        self.table.insert((bit_board_state.board_state_numbers(), max_move), max);
-                    }
                 }
+            }
+
+            if lazy && result.0 <= min{
+                extension = 0;
+                if bit_board_state.piece_value(chess_move.target() as usize) != 0 && depth == 1{
+                    extension = std::cmp::max(1, extension);
+                }
+                result = self.search(&mut bit_board_state.perform_move(chess_move), depth-1+extension, alpha, beta, true_depth +1, false, match_history);
             }
             
             if result.0 <= min{
@@ -428,9 +445,10 @@ impl Bot2 {
                 break;
             }
 
-            /*if self.start_time.elapsed().unwrap().as_millis() > 100{
+            if self.start_time.elapsed().unwrap().as_millis() > 2000{
+                self.search_stopped = true;
                 break;
-            }*/
+            }
 
             move_placement += 1;
         }
@@ -459,7 +477,8 @@ impl Clone for Bot2{
             table_size: self.table_size,
             start_time: SystemTime::now(),
             average_best_move_placement: 0.0,
-            average_best_move_index_placement: 0
+            average_best_move_index_placement: 0,
+            search_stopped: false
         }
     }
 }

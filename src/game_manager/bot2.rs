@@ -15,7 +15,7 @@ use fxhash::FxHasher;
 
 const DEFAULT_TABLE_SIZE:usize = 1000000;
 const DEFAULT_SEARCH_DEPTH:i64 = 6;
-const DEFAULT_MAX_DEPTH:usize = 7;
+const DEFAULT_MAX_DEPTH:usize = 6;
 const DEFAULT_MAX_TIME:Option<u128> = None;
 
 pub struct Bot2{
@@ -132,6 +132,7 @@ impl Bot2 {
             return false;
         }
     }
+
     fn promising_move(&self, bit_board_state:&mut BitBoardState, chess_move: &mut ChessMove, ply: usize, best_moves_option:Option<&Vec<(ChessMove, i32)>>){
 
         let mut promising_level = 0;
@@ -294,7 +295,8 @@ impl Bot2 {
         let mut eval:i32 = 0;
         //eval += fastrand::i32(-5..5);
 
-        eval+=bit_board_state.piece_count()*10;
+        //eval += bit_board_state.piece_count()*10;
+        eval += self.capture_search(bit_board_state, i32::MIN, i32::MAX, 0);
 
 
         eval += (Bot2::pawn_placement_score(pieces[WHITE][PAWN], WHITE) - 
@@ -312,6 +314,70 @@ impl Bot2 {
 
 
         return eval;
+    }
+
+    //returns the piece count after a series of best captures
+    //for now very basic implementation
+    fn capture_search(&mut self, bit_board_state:&mut BitBoardState, mut alpha:i32, mut beta:i32, capture_depth:usize) -> i32{
+
+        //Not directly related to piece count but should work
+        let game_state = bit_board_state.game_state();
+        match game_state{
+            GameState::Black => {return -1000000}
+            GameState::White => {return 1000000}
+            GameState::Draw => {return 0}
+            GameState::Playing => {}
+        }
+        let mut moves = bit_board_state.gen_moves_legal().moves_vec();
+
+        moves.retain(|m|{
+            match m.flag(){
+                B_CASTLE_KING | B_CASTLE_QUEEN | W_CASTLE_KING | W_CASTLE_QUEEN => {return false;}//castle is never a capture
+                WHITE_EN_PASSANT | BLACK_EN_PASSANT => {return true;}//en passant is allways a capture
+                _ => {
+                    return bit_board_state.piece_value(m.target() as usize) != 0;
+                }
+            }
+        });
+        //moves should only contain captures at this point
+
+
+        //if there are no more captures available, return the piece count
+        if moves.len() == 0 {
+            return bit_board_state.piece_count();
+        }
+
+        //at worst either player can choose to not capture
+        let mut min = bit_board_state.piece_count();
+        let mut max = bit_board_state.piece_count();
+
+
+        for capture in moves{
+
+            let result = self.capture_search(&mut bit_board_state.perform_move(capture), alpha, beta, capture_depth+1);
+
+            if result > max {
+                max = result;
+            }
+            if result < min{
+                min = result;
+            }
+            if max > alpha{
+                alpha = max;
+            }
+            if min < beta{
+                beta = min;
+            }
+            if alpha > beta{
+                break;
+            }
+        }
+
+        if bit_board_state.white_to_move(){
+            return max;
+        }else{
+            return min;
+        }
     }
 
     fn search(&mut self, mut bit_board_state:&mut BitBoardState, depth:i64, mut alpha:i32, mut beta:i32, true_depth:usize, first: bool, match_history:&mut Vec<BoardStateNumbers>) -> (i32, ChessMove){
@@ -398,10 +464,6 @@ impl Bot2 {
             if (move_placement as f64)/move_count > 0.8 && move_count > 9.0 && depth > 3{
                 extension -=1;
                 lazy = true;
-            }
-
-            if bit_board_state.piece_value(chess_move.target() as usize) != 0 && depth == 1{
-                extension = std::cmp::max(1, extension);
             }
 
             

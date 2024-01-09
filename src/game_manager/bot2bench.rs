@@ -4,10 +4,12 @@
 mod tests{
     use std::time::SystemTime;
 
-    use crate::game_manager::{bot2::Bot2, bot::{Bot, GetMoveResult}, board2::BoardState, state_bitboard::BoardStateNumbers};
+    use crate::game_manager::{bot2::Bot2, bot::{Bot, GetMoveResult}, board2::BoardState, state_bitboard::{BoardStateNumbers, BitBoardState, bit_boards}, bot2_2::Bot2_2, move_string::{lan_move, move_string_short}, bot2_3::Bot2_3};
 
     #[test]
     fn bot_bench(){
+        bit_boards::populate_rook_moves();
+        bit_boards::populate_bishop_moves();
         /*
         tests many differnet positions and averages the results
          */
@@ -28,7 +30,7 @@ mod tests{
         let mut avg_best_move_index:f64 = 0.0;
         let mut avg_nodes_searched:f64 = 0.0;
         for fen in fens{
-                let mut bot2 = Bot2::new(7, 16, 1000000, None);
+                let mut bot2 = Bot2_3::new(7, 18, 1000000, None);
                 let start_time = SystemTime::now();
 
                 let results:GetMoveResult = bot2.get_move(BoardState::new_from_fen(fen), &mut Vec::<BoardStateNumbers>::new());
@@ -54,6 +56,23 @@ mod tests{
         let mut bot2 = Bot2::default();
         bot2.get_move(BoardState::new_from_fen(fen), &mut Vec::<BoardStateNumbers>::new());
     }
+
+
+    #[test]
+    fn bot_debug(){
+        bit_boards::populate_rook_moves();
+        bit_boards::populate_bishop_moves();
+        let fen = "r3k1nr/pbpp1p2/1p4p1/3Pp1q1/5P1p/1PN3P1/P1P1QPBP/2R1K1R1 b kq - 0 14";
+        let mut bot = Bot2_2::new(3, 3, 1000000, Some(200));
+
+        let mut bit_board_state = BitBoardState::new();
+        let board_state = BoardState::new_from_fen(fen);
+        bit_board_state.board_setup(&board_state);
+        let results = bot.get_move_bb(bit_board_state, &mut Vec::<BoardStateNumbers>::new());
+        println!("{}", move_string_short(results.chess_move()));
+        println!("eval: {}", results.eval());
+    }
+
 
 
     

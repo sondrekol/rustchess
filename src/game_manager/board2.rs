@@ -1,5 +1,7 @@
 
-use std::hash::{Hash, Hasher};
+use std::{hash::{Hash, Hasher}, fmt};
+
+use super::move_string::lan_move;
 
 
 
@@ -213,6 +215,15 @@ impl Clone for ChessMove{
 }
 
 impl Copy for ChessMove{}
+
+impl fmt::Debug for ChessMove{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ChessMove")
+        .field("move", &lan_move(*self))
+        .field("flag", &self.flag())
+        .finish()
+    }
+}
 
 impl PartialEq for ChessMove {
     fn eq(&self, other: &Self) -> bool {

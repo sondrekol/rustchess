@@ -1,104 +1,56 @@
 #[cfg(test)]
-mod tests{
+mod test{
     use std::{time::SystemTime, fs::File, io::Write};
+    use std::{
+        io::{stdout},
+        thread::sleep,
+        time::Duration,
+    };
 
-    use crate::game_manager::{bot2::Bot2, bot::{Bot, GetMoveResult}, board2::{BoardState, GameState, ChessMove, W_CASTLE_KING, PROMOTE_TO_BISHOP, W_CASTLE_QUEEN, B_CASTLE_KING, B_CASTLE_QUEEN, PROMOTE_TO_KNIGHT, PROMOTE_TO_ROOK}, state_bitboard::{BitBoardState, bit_boards, BoardStateNumbers}};
+    use crate::game_manager::bot2_3::Bot2_3;
+    use crate::game_manager::{bot2::Bot2, bot::{Bot, GetMoveResult}, board2::{BoardState, GameState, ChessMove, W_CASTLE_KING, PROMOTE_TO_BISHOP, W_CASTLE_QUEEN, B_CASTLE_KING, B_CASTLE_QUEEN, PROMOTE_TO_KNIGHT, PROMOTE_TO_ROOK}, state_bitboard::{BitBoardState, bit_boards, BoardStateNumbers}, bot2_2::Bot2_2, move_string::{lan_move, move_string_short}};
 
-    fn move_string_short(chess_move:&ChessMove) -> String{
-        return format!("{}{} f({})", string_square(chess_move.origin()), string_square(chess_move.target()), chess_move.flag()); 
-    }
-
-    fn string_square(square:u8) -> String{
-        let mut str = "".to_owned();
-        match square%8{
-            0 => {str.push_str("a")}
-            1 => {str.push_str("b")}
-            2 => {str.push_str("c")}
-            3 => {str.push_str("d")}
-            4 => {str.push_str("e")}
-            5 => {str.push_str("f")}
-            6 => {str.push_str("g")}
-            7 => {str.push_str("h")}
-            _ => {}
-        }
-        match square/8{
-            0 => {str.push_str("1")}
-            1 => {str.push_str("2")}
-            2 => {str.push_str("3")}
-            3 => {str.push_str("4")}
-            4 => {str.push_str("5")}
-            5 => {str.push_str("6")}
-            6 => {str.push_str("7")}
-            7 => {str.push_str("8")}
-            _ => {}
-        }
-        return str;
-    }
-
-    fn lan_move(chess_move:ChessMove) -> String{
-        match chess_move.flag() {
-            W_CASTLE_KING => {
-                return "e1g1".to_string();
-            }
-            W_CASTLE_QUEEN => {
-                return "e1c1".to_string();
-            }
-            B_CASTLE_KING => {
-                return "e8g8".to_string();
-            }
-            B_CASTLE_QUEEN => {
-                return "e8c8".to_string();
-            }
-            PROMOTE_TO_BISHOP => {
-                return format!("{}{}b", string_square(chess_move.origin()), string_square(chess_move.target()));
-            }
-            PROMOTE_TO_KNIGHT => {
-                return format!("{}{}n", string_square(chess_move.origin()), string_square(chess_move.target()));
-            }
-            PROMOTE_TO_ROOK => {
-                return format!("{}{}r", string_square(chess_move.origin()), string_square(chess_move.target()));
-            }
-            _ => {
-                return format!("{}{}", string_square(chess_move.origin()), string_square(chess_move.target()));
-            }
-        }
-    }
-
-    fn play_match<T: Bot + Clone>(mut bot_white: T, mut bot_black: T) -> (GameState, String){
+    fn play_match<T1: Bot + Clone, T2: Bot + Clone>(mut bot_white: T1, mut bot_black: T2, fen: &str) -> (GameState, String){
 
         let mut game_string = String::new();
         let mut board_state = BitBoardState::new();
-        board_state.board_setup(&BoardState::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"));
+        board_state.board_setup(&BoardState::new_from_fen(fen));
 
         let mut match_history = Vec::<BoardStateNumbers>::new();
+        let mut ply = 0;
         while board_state.game_state() == GameState::Playing {
-
             if board_state.white_to_move() {
                 let results = bot_white.get_move_bb(board_state, &mut match_history);
                 match_history.push(board_state.board_state_numbers());
                 if results.chess_move().is_null() {
+                    println!("recieved null move");
                     return (board_state.game_state(), game_string);
                 }
 
                 board_state = board_state.perform_move(*results.chess_move());
                 bot_white = bot_white.clone();
-                println!("white moved: {}, eval: {}", move_string_short(results.chess_move()), results.eval() as f64/ 100.0);
+                //println!("{}: white moved: {}, eval: {}", ply/2 + 1, move_string_short(results.chess_move()), results.eval() as f64/ 100.0);
                 game_string.push_str(lan_move(*results.chess_move()).as_str())
             }else {
                 let results = bot_black.get_move_bb(board_state, &mut match_history);
                 match_history.push(board_state.board_state_numbers());
                 if results.chess_move().is_null() {
+                    println!("recieved null move");
                     return (board_state.game_state(), game_string);
                 }
 
                 board_state = board_state.perform_move(*results.chess_move());
                 bot_black = bot_black.clone();
-                println!("black moved: {}, eval: {}", move_string_short(results.chess_move()), results.eval() as f64/ 100.0);
+                //println!("{}: black moved: {}, eval: {}", ply/2 + 1, move_string_short(results.chess_move()), results.eval() as f64/ 100.0);
                 game_string.push_str(lan_move(*results.chess_move()).as_str())
             }
             game_string.push('\n');
             if match_history.len() > 300{
                 return (board_state.game_state(), game_string);
+            }
+            ply += 1;
+            if match_history.iter().filter(|&n| *n == board_state.board_state_numbers()).count() == 3{
+                return (GameState::Draw, game_string);
             }
         }
         return (board_state.game_state(), game_string);
@@ -106,13 +58,13 @@ mod tests{
     }
 
     #[test]
-    fn bot_comparer(){
+    fn bot_match(){
         bit_boards::populate_rook_moves();
         bit_boards::populate_bishop_moves();
-        let mut bot1 = Bot2::new(7, 7, 1000000, Some(2000));
-        let mut bot2 = Bot2::new(7, 7, 1000000, Some(2000));
+        let mut bot1 = Bot2_3::new(15, 20, 1000000, Some(800));
+        let mut bot2 = Bot2_2::new(15, 20, 1000000, Some(800));
 
-        let (result, game_string) = play_match(bot1, bot2);
+        let (result, game_string) = play_match(bot2, bot1, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         match result {
             GameState::Black => {
                 println!("black won");
@@ -131,6 +83,71 @@ mod tests{
         file.write_all(game_string.as_bytes());
         
     }
+
+
+    fn print_wins(bot1:i32, draws:i32, bot2:i32, pos_nr:usize){
+        println!("bot1 {}/{}/{} bot2 -- pos:{}", bot1, draws, bot2, pos_nr);
+    }
+    #[test]
+    fn bot_comparer(){
+        let fens = [
+                "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+                "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+                "r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+                "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/2N2N2/PPPP1PPP/R1BQKB1R b KQkq - 3 3",
+                "rnbqkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2",
+                "rnbqkb1r/pp1ppppp/5n2/2p5/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 3",
+                "rnbqkb1r/pppppp1p/5np1/8/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 3",
+                "rnbqkbnr/pp3ppp/4p3/1Npp4/3P1B2/8/PPP1PPPP/R2QKBNR b KQkq - 1 4",
+                "rnbqk1nr/ppppppbp/6p1/8/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 1 3"];
+        bit_boards::populate_rook_moves();
+        bit_boards::populate_bishop_moves();
+        let bot1 = Bot2_2::new(15, 30, 1000000, Some(500));
+        let bot2 = Bot2::new(15, 30, 1000000, Some(500));
+
+        let mut bot1_wins = 0;
+        let mut draws = 0;
+        let mut bot2_wins = 0;
+        for i in 0..fens.len(){
+            let fen = fens[i];
+            let (result, game_string) = play_match(bot2.clone(), bot1.clone(), fen);
+            match result {
+                GameState::Black => {
+                    bot1_wins += 1;
+                }
+                GameState::White => {
+                    bot2_wins += 1;
+                }
+                GameState::Draw => {
+                    draws += 1;
+                }
+                GameState::Playing => {
+                    draws += 1;
+                }
+            }
+            print_wins(bot1_wins, draws, bot2_wins, i);
+            let (result, game_string) = play_match(bot1.clone(), bot2.clone(), fen);
+            match result {
+                GameState::Black => {
+                    bot2_wins += 1;
+                }
+                GameState::White => {
+                    bot1_wins += 1;
+                }
+                GameState::Draw => {
+                    draws += 1;
+                }
+                GameState::Playing => {
+                    draws += 1;
+                }
+            }
+            print_wins(bot1_wins, draws, bot2_wins, i);
+
+        }
+        println!("Bot1: {bot1_wins}/{draws}/{bot2_wins} Bot 2");
+        
+    }
+
 
 
     

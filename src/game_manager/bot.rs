@@ -6,12 +6,13 @@ pub struct GetMoveResult{
     chess_move: ChessMove,
     searched_positions: usize,
     eval: i32,
-    average_best_move_index: f64
+    average_best_move_index: f64,
+    depth_reached: u32,
 }
 
 impl GetMoveResult{
-    pub fn new(chess_move:ChessMove, searched_positions:usize, eval:i32, avg_best_move_i:f64) -> Self{
-        Self { chess_move: chess_move, searched_positions: searched_positions, eval: eval, average_best_move_index: avg_best_move_i }
+    pub fn new(chess_move:ChessMove, searched_positions:usize, eval:i32, avg_best_move_i:f64, depth_reached: u32) -> Self{
+        Self { chess_move: chess_move, searched_positions: searched_positions, eval: eval, average_best_move_index: avg_best_move_i, depth_reached: depth_reached}
     }
 
     pub fn chess_move(&self) -> &ChessMove{
@@ -26,6 +27,10 @@ impl GetMoveResult{
     }
     pub fn avg_best_move_i(&self) -> f64 {
         return self.average_best_move_index;
+    }
+
+    pub fn depth_reached(&self) -> u32{
+        return self.depth_reached;
     }
 }
 

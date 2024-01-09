@@ -5,23 +5,26 @@ use crate::game_manager::state_bitboard::BoardStateNumbers;
 use self::{board2::{BoardState, ChessMove},
 bot::{Bot, GetMoveResult}, 
 bot2::Bot2, 
-state_bitboard::bit_boards::{populate_rook_moves, populate_bishop_moves}};
+state_bitboard::bit_boards::{populate_rook_moves, populate_bishop_moves}, bot2_2::Bot2_2, bot2_3::Bot2_3};
 
 mod board2;
 mod board2tests;
 mod bot;
 mod bot2;
+mod bot2_2;
+mod bot2_3;
 mod bot2bench;
 mod state_bitboard;
 mod state_bitboard_tests;
 mod bot_evaluater;
 mod transposition_table;
+mod move_string;
 
 pub struct GameManager{
     player_color: bool,
     board_state: BoardState,
     turn: bool,
-    bot: Bot2,
+    bot: Bot2_3,
     bot_thread: Option<JoinHandle<GetMoveResult>>,
     bot_start_time: SystemTime
 
@@ -33,12 +36,13 @@ impl GameManager{
         //setup rook and bisshop moves
         state_bitboard::bit_boards::populate_rook_moves();
         state_bitboard::bit_boards::populate_bishop_moves();
+        let board_state = BoardState::new_from_fen(fen);
 
         Self{
             player_color: color,
-            turn: true,
-            board_state: BoardState::new_from_fen(fen),
-            bot: Bot2::default(),
+            turn: board_state.white_to_move(),
+            board_state: board_state,
+            bot: Bot2_3::new(15, 20, 1000000, Some(60000)),
             bot_thread: None,
             bot_start_time: SystemTime::now()
         }
@@ -92,6 +96,7 @@ impl GameManager{
                         println!("{} kN/s", get_move_result.num_pos()/used_time as usize);
                     }
                     println!("average index of best move: {}", get_move_result.avg_best_move_i());
+                    println!("depth reached: {}", get_move_result.depth_reached());
                     println!();
                     self.board_state = self.board_state.perform_move(*get_move_result.chess_move());
                     self.turn = !self.turn;

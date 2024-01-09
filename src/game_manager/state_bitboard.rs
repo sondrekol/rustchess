@@ -50,7 +50,10 @@ const DOUBLE_PAWN_MOVE:u8 = 0b1010;
 const NO_FLAG:u8 = 0b1111;
 
 
-//smaller state used for transposition table
+//minimal representation of a chess position
+//used for hashmaps, checking for equality etc
+// ! Bug: no en passant and en passant square on A-file has the same representation,
+// ! most likely rare that this will interefere, but needs to be fixed 
 #[derive(Hash, PartialEq, Eq, Clone, Copy)]
 pub struct BoardStateNumbers{
     piece_bb: [u64; 6],
@@ -433,11 +436,11 @@ impl BitBoardState{
         }
     }
 
-    //generate all legal moves except for castles
+    //generate all legal moves except for castles or king moves
     //this function assumes "to move side" is not in check
+    //use mask to to mask out target squares
     //a move is then legal if and only if it is
         //pseudo legal +
-        //for king: does not move into check
         //for pinned pieces: does not move out of pin line
     fn legal_moves(&mut self, mask:u64){
         //generate normal moves for king
@@ -462,6 +465,7 @@ impl BitBoardState{
         }
     }
 
+    //updates pinned pieces, pin lines and checkline
     fn update_pinned_pieces_and_check_line(&mut self){
         let king_pos = u64::trailing_zeros(self.piece_bb[self.to_move][KING]) as usize;
 
@@ -547,6 +551,7 @@ impl BitBoardState{
         //Count king attackeers
         let king_attack_bb = bit_boards::KING_MOVES[pos] & !(self.color_mask[self.to_move]);
         let king_attacker = king_attack_bb & self.piece_bb[self.other][KING];
+        
         return rook_attackers | bishop_attackers | knight_attackers | pawn_attackers | king_attacker;
     }
 
@@ -559,18 +564,17 @@ impl BitBoardState{
         return u64::count_ones(self.checkers) as usize;
     }
 
-    //?for now moves are precalculated
+    //returns all legal moves, also stores the list in case the method is called again on the same position
     pub fn gen_moves_legal(&mut self) -> ChessMoveList{
+
         if self.legal_moves_calculated {
             return self.legal_moves;
         }
+
         self.legal_moves.reset();
 
         let king_pos = u64::trailing_zeros(self.piece_bb[self.to_move][KING]) as usize;
-        if king_pos >= 64 {
-            println!("s");
-            panic!("king position is invalid");
-        }
+        assert!(king_pos < 64);
 
         self.update_pinned_pieces_and_check_line();
 
@@ -581,9 +585,9 @@ impl BitBoardState{
             1 => {
                 if self.check_line == 0 {
                     self.legal_king_moves();
-                    self.legal_moves(!self.checkers); //happens if knight or pawn check, in which case non king moves must capture the pawn
+                    self.legal_moves(!self.checkers);//not checked by sliding piece, non king moves must capture the checker
 
-                     //if there is a pawn checking, and en passant possible then you should also generate the up to 2 legal en passant moves
+                     //if there is a pawn checking, and en passant possible then also generate the up to 2 legal en passant moves
                     if self.en_passant_possible && self.piece_bb[self.other][PAWN] & self.checkers != 0{
                         let mut pawns = self.piece_bb[self.to_move][PAWN];
                         while pawns != 0 {

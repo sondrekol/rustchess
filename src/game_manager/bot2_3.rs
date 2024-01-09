@@ -75,11 +75,9 @@ impl Bot for Bot2_3{
             self.num_pos = 0;
             let search_result = self.search(&mut bit_board_state, i, i32::MIN, i32::MAX, 0, true, match_history);
             //self.table.clear();
-            if best_move != search_result.1{
-                best_move = search_result.1;
-                if best_eval < 30000 && best_eval > -30000 {
-                    best_eval = search_result.0;
-                }
+            best_move = search_result.1;
+            if search_result.0 < 30000 && search_result.0 > -30000 {//if depth stopped before calculating the evaluation of the best move, use the previous
+                best_eval = search_result.0;
             }
             if self.search_stopped {
                 break;

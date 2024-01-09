@@ -1,6 +1,6 @@
 use std::{thread::{self, JoinHandle}, ptr::null, time::SystemTime};
 
-use crate::game_manager::state_bitboard::BoardStateNumbers;
+use crate::game_manager::{state_bitboard::BoardStateNumbers, move_string::lan_move};
 
 use self::{board2::{BoardState, ChessMove},
 bot::{Bot, GetMoveResult}, 
@@ -42,7 +42,7 @@ impl GameManager{
             player_color: color,
             turn: board_state.white_to_move(),
             board_state: board_state,
-            bot: Bot2_3::new(15, 20, 1000000, Some(60000)),
+            bot: Bot2_3::new(15, 25, 1000000, Some(5000)),
             bot_thread: None,
             bot_start_time: SystemTime::now()
         }
@@ -87,7 +87,7 @@ impl GameManager{
                     }
                     let used_time =self.bot_start_time.elapsed().unwrap().as_millis();
                     let get_move_result = bot_result.unwrap();
-                    println!("Bot finished with move: origin: {}, target: {}, flag:{}", get_move_result.chess_move().origin(), get_move_result.chess_move().target(), get_move_result.chess_move().flag());
+                    println!("Bot finished with move: {}", lan_move(*get_move_result.chess_move()));
                     println!("time elapsed: {}", used_time);
                     println!("evaluated {} positions", get_move_result.num_pos());
                     println!("eval: {}", (get_move_result.eval() as f64)/100.0);

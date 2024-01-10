@@ -75,12 +75,12 @@ impl Bot for Bot2_3{
             self.num_pos = 0;
             let search_result = self.search(&mut bit_board_state, i, i32::MIN, i32::MAX, 0, true, match_history);
             //self.table.clear();
+            if self.search_stopped {
+                break;
+            }
             best_move = search_result.1;
             if search_result.0 < 30000 && search_result.0 > -30000 {//if depth stopped before calculating the evaluation of the best move, use the previous
                 best_eval = search_result.0;
-            }
-            if self.search_stopped {
-                break;
             }
         }
 
@@ -288,7 +288,7 @@ impl Bot2_3 {
         return score;
     }
 
-    fn evaluate(&mut self, bit_board_state:&mut BitBoardState) -> i32{
+    fn evaluate(&mut self, bit_board_state:&BitBoardState) -> i32{
         self.num_pos += 1;
 
         
@@ -301,19 +301,22 @@ impl Bot2_3 {
         let mut eval:i32 = 0;
         //eval += fastrand::i32(-5..5);
 
-        //eval += bit_board_state.piece_count()*10;
-        eval += self.capture_search(bit_board_state, i32::MIN, i32::MAX, 0, None)*10;
+        eval += bit_board_state.piece_count()*10;
+        //eval += self.capture_search(bit_board_state, i32::MIN, i32::MAX, 0, None)*10;
 
 
         eval += (Bot2_3::pawn_placement_score(pieces[WHITE][PAWN], WHITE) - 
                 Bot2_3::pawn_placement_score(pieces[BLACK][PAWN], BLACK))
                 *3;
+
         eval += (Bot2_3::knight_placement_score(pieces[WHITE][KNIGHT]) -
                 Bot2_3::knight_placement_score(pieces[BLACK][KNIGHT]))
                 *5;
+
         eval += (Bot2_3::bishop_placement_score(pieces[WHITE][BISHOP], WHITE) -
                 Bot2_3::bishop_placement_score(pieces[BLACK][BISHOP], BLACK))
                 *15;
+
         eval += (Bot2_3::rook_score(pieces[WHITE][ROOK], pieces[WHITE][PAWN], piece_mask) -
                 Bot2_3::rook_score(pieces[BLACK][ROOK], pieces[BLACK][PAWN], piece_mask)
                 )*20;
@@ -339,8 +342,8 @@ impl Bot2_3 {
         }
     }
 
-    //returns the piece count after a series of best captures
-    //for now very basic implementation
+    //finsishes the search by looking at any captures in a position, and subsequent "capture-backs" on the same square
+    //all nodes are evaluated, a node will then be evaluated as the min/max of its children and itself
     fn capture_search(&mut self, bit_board_state:&mut BitBoardState, mut alpha:i32, mut beta:i32, capture_depth:usize, opt_capture_square:Option<u8>) -> i32{
 
         //Not directly related to piece count but should work
@@ -366,10 +369,10 @@ impl Bot2_3 {
                 m.target() == capture_square
             });
         }
-
+        let this_eval = self.evaluate(bit_board_state);
         //if there are no more captures available, return the piece count
         if moves.len() == 0 {
-            return bit_board_state.piece_count();
+            return this_eval;
         }
 
         moves.sort_by(|a, b| 
@@ -379,8 +382,8 @@ impl Bot2_3 {
             );
 
         //at worst either player can choose to not capture
-        let mut min = bit_board_state.piece_count();
-        let mut max = bit_board_state.piece_count();
+        let mut min = this_eval;
+        let mut max = this_eval;
 
 
         for capture in moves{
@@ -437,7 +440,7 @@ impl Bot2_3 {
         
         if depth <= 0 || true_depth >= self.max_depth{
             match_history.pop();
-            return (self.evaluate(bit_board_state), ChessMove::new_empty());
+            return (self.capture_search(bit_board_state, alpha, beta, 0, None), ChessMove::new_empty());
         }
         let mut moves = bit_board_state.gen_moves_legal().moves_vec();
 

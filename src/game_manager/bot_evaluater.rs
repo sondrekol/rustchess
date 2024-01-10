@@ -61,8 +61,8 @@ mod test{
     fn bot_match(){
         bit_boards::populate_rook_moves();
         bit_boards::populate_bishop_moves();
-        let mut bot1 = Bot2_3::new(15, 20, 1000000, Some(800));
-        let mut bot2 = Bot2_2::new(15, 20, 1000000, Some(800));
+        let mut bot1 = Bot2_3::new(15, 20, 1000000, Some(100));
+        let mut bot2 = Bot2_2::new(15, 20, 1000000, Some(100));
 
         let (result, game_string) = play_match(bot2, bot1, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         match result {
@@ -99,11 +99,23 @@ mod test{
                 "rnbqkb1r/pp1ppppp/5n2/2p5/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 3",
                 "rnbqkb1r/pppppp1p/5np1/8/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 3",
                 "rnbqkbnr/pp3ppp/4p3/1Npp4/3P1B2/8/PPP1PPPP/R2QKBNR b KQkq - 1 4",
-                "rnbqk1nr/ppppppbp/6p1/8/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 1 3"];
+                "rnbqk1nr/ppppppbp/6p1/8/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 1 3",
+                "rnbqkb1r/pp1p1ppp/4pn2/2p5/3P1B2/2P2N2/PP2PPPP/RN1QKB1R b KQkq - 0 4",
+                "rnbqk2r/ppp1ppbp/5np1/3p4/2PP4/5NP1/PP2PP1P/RNBQKB1R w KQkq - 0 5",
+                "r1bqkbnr/pppp1ppp/8/4n3/4PP2/8/PPP3PP/RNBQKBNR b KQkq - 0 4",
+                "rnbqkbnr/p1p1pppp/8/1p6/2pPP3/5N2/PP3PPP/RNBQKB1R b KQkq - 1 4",
+                "rnbqkbnr/pp3ppp/4p3/2pp4/3P4/4PN2/PPP2PPP/RNBQKB1R w KQkq - 0 4",
+                "rnbqkbnr/pp2pppp/3p4/2p5/8/4PN2/PPPPBPPP/RNBQK2R b KQkq - 1 3",
+                "r1bqkb1r/pp1p1ppp/4pn2/8/3P1B2/8/PP1NPPPP/R2QKB1R b KQkq - 0 7",
+                "rn1qkb1r/pp2pppp/2p2n2/3p1b2/3P1B2/2N2P2/PPP1P1PP/R2QKBNR w KQkq - 0 5",
+                "rnbq1rk1/pp1pppbp/2p2np1/8/3P4/5NP1/PPP1PPBP/RNBQ1RK1 w - - 0 6",
+                "r1bqk1nr/pppp1pp1/2n4p/2b1p3/2B1P3/P1N2N2/1PPP1PPP/R1BQK2R b KQkq - 0 5",
+                "rnbqkbnr/pppp1ppp/8/4p3/3PP3/8/PPP2PPP/RNBQKBNR b KQkq - 0 2",
+                "rnbqkb1r/p1pp1ppp/1p2pn2/8/2PP4/5NP1/PP2PP1P/RNBQKB1R b KQkq - 0 4"];
         bit_boards::populate_rook_moves();
         bit_boards::populate_bishop_moves();
-        let bot1 = Bot2_2::new(15, 30, 1000000, Some(500));
-        let bot2 = Bot2::new(15, 30, 1000000, Some(500));
+        let bot1 = Bot2_3::new(15, 30, 1000000, Some(200));
+        let bot2 = Bot2_2::new(15, 30, 1000000, Some(200));
 
         let mut bot1_wins = 0;
         let mut draws = 0;

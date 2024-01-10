@@ -42,7 +42,7 @@ impl GameManager{
             player_color: color,
             turn: board_state.white_to_move(),
             board_state: board_state,
-            bot: Bot2_3::new(15, 25, 1000000, Some(5000)),
+            bot: Bot2_3::new(15, 25, 1000000, Some(10000)),
             bot_thread: None,
             bot_start_time: SystemTime::now()
         }

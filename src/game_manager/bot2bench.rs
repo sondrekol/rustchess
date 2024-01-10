@@ -4,7 +4,7 @@
 mod tests{
     use std::time::SystemTime;
 
-    use crate::game_manager::{bot2::Bot2, bot::{Bot, GetMoveResult}, board2::BoardState, state_bitboard::{BoardStateNumbers, BitBoardState, bit_boards}, bot2_2::Bot2_2, move_string::{lan_move, move_string_short}, bot2_3::Bot2_3};
+    use crate::game_manager::{bot2::Bot2, bot::{Bot, GetMoveResult}, board2::BoardState, state_bitboard::{BoardStateNumbers, BitBoardState, bit_boards}, bot2_2::Bot2_2, move_string::{lan_move, move_string_short}, bot2_3::Bot2_3, bot2_4::Bot2_4};
 
     #[test]
     fn bot_bench(){
@@ -30,7 +30,7 @@ mod tests{
         let mut avg_best_move_index:f64 = 0.0;
         let mut avg_nodes_searched:f64 = 0.0;
         for fen in fens{
-                let mut bot2 = Bot2_3::new(7, 18, 1000000, None);
+                let mut bot2 = Bot2_4::new(7, 18, 1000000, None);
                 let start_time = SystemTime::now();
 
                 let results:GetMoveResult = bot2.get_move(BoardState::new_from_fen(fen), &mut Vec::<BoardStateNumbers>::new());

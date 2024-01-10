@@ -5,7 +5,7 @@ use crate::game_manager::{state_bitboard::BoardStateNumbers, move_string::lan_mo
 use self::{board2::{BoardState, ChessMove},
 bot::{Bot, GetMoveResult}, 
 bot2::Bot2, 
-state_bitboard::bit_boards::{populate_rook_moves, populate_bishop_moves}, bot2_2::Bot2_2, bot2_3::Bot2_3};
+state_bitboard::bit_boards::{populate_rook_moves, populate_bishop_moves}, bot2_2::Bot2_2, bot2_3::Bot2_3, bot2_4::Bot2_4, bot2_5::Bot2_5};
 
 mod board2;
 mod board2tests;
@@ -13,6 +13,8 @@ mod bot;
 mod bot2;
 mod bot2_2;
 mod bot2_3;
+mod bot2_4;
+mod bot2_5;
 mod bot2bench;
 mod state_bitboard;
 mod state_bitboard_tests;
@@ -24,7 +26,7 @@ pub struct GameManager{
     player_color: bool,
     board_state: BoardState,
     turn: bool,
-    bot: Bot2_3,
+    bot: Bot2_5,
     bot_thread: Option<JoinHandle<GetMoveResult>>,
     bot_start_time: SystemTime
 
@@ -42,7 +44,7 @@ impl GameManager{
             player_color: color,
             turn: board_state.white_to_move(),
             board_state: board_state,
-            bot: Bot2_3::new(15, 25, 1000000, Some(10000)),
+            bot: Bot2_5::new(15, 25, 1000000, Some(500)),
             bot_thread: None,
             bot_start_time: SystemTime::now()
         }

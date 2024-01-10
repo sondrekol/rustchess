@@ -65,6 +65,17 @@ pub const WEST_OF:[u64; 8] = [ //Indexed by file
     FILE_A | FILE_B | FILE_C | FILE_D | FILE_E | FILE_F | FILE_G | FILE_H,
 ];
 
+pub const NEIGHBOUR_FILES:[u64; 8] = [
+    FILE_B,
+    FILE_A | FILE_C,
+    FILE_B | FILE_D,
+    FILE_C | FILE_E,
+    FILE_D | FILE_F,
+    FILE_E | FILE_G,
+    FILE_F | FILE_H,
+    FILE_G
+];
+
 pub const CASTLE_W_K_LINE:u64 = 0x0000000000000060;
 pub const CASTLE_W_Q_LINE:u64 = 0x000000000000000E;
 pub const CASTLE_B_K_LINE:u64 = 0x6000000000000000;
@@ -317,6 +328,8 @@ pub fn file_of(square: usize) -> u64{
 pub fn rank_of(square: usize) -> u64{
     return RANKS[square/8];
 }
+
+
 
 
 static mut ROOK_MOVES:[u64; ROOK_MAP_SIZE] = [0;ROOK_MAP_SIZE];

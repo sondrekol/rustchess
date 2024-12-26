@@ -13,9 +13,8 @@ use piston::event_loop::{EventSettings, Events};
 use piston::input::{RenderArgs, RenderEvent, UpdateArgs};
 use piston::window::WindowSettings;
 use piston::{
-    Button, MouseButton, ButtonEvent, MouseCursorEvent, ButtonState, UpdateEvent
+    Button, ButtonEvent, MouseCursorEvent, ButtonState, UpdateEvent
 };
-use graphics::{Image, clear};
 use std::collections::HashMap;
 
 
@@ -154,7 +153,7 @@ impl App {
 
     fn pick_up_piece(&mut self){
         let (x, y) = self.cursor_board_coordinates();
-        if(x < 8 && y < 8){
+        if x < 8 && y < 8 {
             self.piece_in_hand = self.board_graphic_state[x][y];
             self.board_graphic_state[x][y] = 0;
         }

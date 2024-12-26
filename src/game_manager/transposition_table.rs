@@ -77,11 +77,11 @@ impl TranspositionTable {
 }
 
 mod test{
-    use super::TranspositionTable;
+    
 
 
     #[test]
     fn table_test(){
-        let table = TranspositionTable::new();
+        
     }
 }

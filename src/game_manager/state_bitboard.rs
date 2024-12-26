@@ -53,7 +53,8 @@ const NO_FLAG:u8 = 0b1111;
 //minimal representation of a chess position
 //used for hashmaps, checking for equality etc
 // ! Bug: no en passant and en passant square on A-file has the same representation,
-// ! most likely rare that this will interefere, but needs to be fixed 
+// !    most likely rare that this will interfere
+// !    new transposition table is planned, but this will still be in use for threefold repitition 
 #[derive(Hash, PartialEq, Eq, Clone, Copy)]
 pub struct BoardStateNumbers{
     piece_bb: [u64; 6],
@@ -627,8 +628,8 @@ impl BitBoardState{
         -(u64::count_ones(self.piece_bb[BLACK][BISHOP]) as i32)*35
         -(u64::count_ones(self.piece_bb[BLACK][ROOK]) as i32)*50
         -(u64::count_ones(self.piece_bb[BLACK][QUEEN]) as i32)*90;
-        
     }
+    
     pub fn update_state(&mut self){
 
     }

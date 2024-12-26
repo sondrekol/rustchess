@@ -8,6 +8,9 @@ mod test{
     };
 
     use crate::game_manager::bot2_3::Bot2_3;
+    use crate::game_manager::bot2_4::Bot2_4;
+    use crate::game_manager::bot2_5::Bot2_5;
+    use crate::game_manager::bot2_6::Bot2_6;
     use crate::game_manager::{bot2::Bot2, bot::{Bot, GetMoveResult}, board2::{BoardState, GameState, ChessMove, W_CASTLE_KING, PROMOTE_TO_BISHOP, W_CASTLE_QUEEN, B_CASTLE_KING, B_CASTLE_QUEEN, PROMOTE_TO_KNIGHT, PROMOTE_TO_ROOK}, state_bitboard::{BitBoardState, bit_boards, BoardStateNumbers}, bot2_2::Bot2_2, move_string::{lan_move, move_string_short}};
 
     fn play_match<T1: Bot + Clone, T2: Bot + Clone>(mut bot_white: T1, mut bot_black: T2, fen: &str) -> (GameState, String){
@@ -114,8 +117,8 @@ mod test{
                 "rnbqkb1r/p1pp1ppp/1p2pn2/8/2PP4/5NP1/PP2PP1P/RNBQKB1R b KQkq - 0 4"];
         bit_boards::populate_rook_moves();
         bit_boards::populate_bishop_moves();
-        let bot1 = Bot2_3::new(15, 30, 1000000, Some(200));
-        let bot2 = Bot2_2::new(15, 30, 1000000, Some(200));
+        let bot1 = Bot2_6::new(15, 30, 1000000, Some(200));
+        let bot2 = Bot2_5::new(15, 30, 1000000, Some(200));
 
         let mut bot1_wins = 0;
         let mut draws = 0;

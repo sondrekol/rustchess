@@ -4,6 +4,7 @@ use std::time::SystemTime;
 
 use crate::game_manager::board2::{BoardState, ChessMove};
 use crate::game_manager::bot::Bot;
+use crate::game_manager::state_bitboard::QUEEN;
 
 use super::board2::{GameState, DOUBLE_PAWN_MOVE, W_CASTLE_KING, W_CASTLE_QUEEN, B_CASTLE_KING, B_CASTLE_QUEEN, WHITE_EN_PASSANT, BLACK_EN_PASSANT, PROMOTE_TO_KNIGHT, PROMOTE_TO_BISHOP, PROMOTE_TO_ROOK, PROMOTE_TO_QUEEN, NO_FLAG};
 use super::bot::GetMoveResult;
@@ -18,7 +19,7 @@ const DEFAULT_SEARCH_DEPTH:i64 = 6;
 const DEFAULT_MAX_DEPTH:usize = 20;
 const DEFAULT_MAX_TIME:Option<u128> = None;
 
-pub struct Bot2_2{
+pub struct Bot2_4{
     search_depth: i64,
     max_depth: usize,
     num_pos: usize,
@@ -34,9 +35,9 @@ pub struct Bot2_2{
 }
 
 
-impl Bot for Bot2_2{
+impl Bot for Bot2_4{
     fn default() -> Self{
-        return Bot2_2::new(DEFAULT_SEARCH_DEPTH, DEFAULT_MAX_DEPTH, DEFAULT_TABLE_SIZE, DEFAULT_MAX_TIME);
+        return Bot2_4::new(DEFAULT_SEARCH_DEPTH, DEFAULT_MAX_DEPTH, DEFAULT_TABLE_SIZE, DEFAULT_MAX_TIME);
     }
 
     fn new(search_depth: i64, max_depth: usize, table_size: usize, max_time: Option<u128>) -> Self{
@@ -78,11 +79,9 @@ impl Bot for Bot2_2{
             if self.search_stopped {
                 break;
             }
-            if best_move != search_result.1{
-                best_move = search_result.1;
-                if best_eval < 30000 && best_eval > -30000 {
-                    best_eval = search_result.0;
-                }
+            best_move = search_result.1;
+            if search_result.0 < 30000 && search_result.0 > -30000 {//if depth stopped before calculating the evaluation of the best move, use the previous
+                best_eval = search_result.0;
             }
         }
 
@@ -97,7 +96,7 @@ impl Bot for Bot2_2{
 }
 
 
-impl Bot2_2 {
+impl Bot2_4 {
 
 
     fn is_check(&self, bit_board_state:&BitBoardState, chess_move: &ChessMove) -> bool{
@@ -129,12 +128,16 @@ impl Bot2_2 {
             }
             90 | -90 => {
                 psuedo_legal_follow_up_captures = bit_boards::RookMoves::mov_map(target, piece_mask);
-                psuedo_legal_follow_up_captures |= bit_boards::BishopMoves::mov_map(target, piece_mask);
+                psuedo_legal_follow_up_captures = bit_boards::BishopMoves::mov_map(target, piece_mask);
             }
             _ => {}
         }
         let other = if bit_board_state.white_to_move() {0} else {1};
-        return psuedo_legal_follow_up_captures & bit_board_state.piece_bb()[other][KING] != 0;
+        if psuedo_legal_follow_up_captures & bit_board_state.piece_bb()[other][KING] != 0 {
+            return true;
+        }else{
+            return false;
+        }
     }
 
     fn promising_move(&self, bit_board_state:&mut BitBoardState, chess_move: &mut ChessMove, ply: usize, best_moves_option:Option<&Vec<(ChessMove, i32)>>){
@@ -190,18 +193,18 @@ impl Bot2_2 {
                 }else{ // for non captures
 
                     if origin_value == 10{
-                        promising_level += Bot2_2::pawn_placement_score(1 << target, WHITE);
-                        promising_level -= Bot2_2::pawn_placement_score(1 << origin, WHITE);
+                        promising_level += Bot2_4::pawn_placement_score(1 << target, WHITE);
+                        promising_level -= Bot2_4::pawn_placement_score(1 << origin, WHITE);
                     }else if origin_value == -10{
-                        promising_level += Bot2_2::pawn_placement_score(1 << target, BLACK);
-                        promising_level -= Bot2_2::pawn_placement_score(1 << origin, BLACK);
+                        promising_level += Bot2_4::pawn_placement_score(1 << target, BLACK);
+                        promising_level -= Bot2_4::pawn_placement_score(1 << origin, BLACK);
                     }else if origin_value == 30 || origin_value == -30{
-                        promising_level += Bot2_2::knight_placement_score(1 << target);
-                        promising_level -= Bot2_2::knight_placement_score(1 << origin);
+                        promising_level += Bot2_4::knight_placement_score(1 << target);
+                        promising_level -= Bot2_4::knight_placement_score(1 << origin);
                     }
                     else if origin_value == 35 || origin_value == -35{
-                        promising_level += Bot2_2::bishop_placement_score(1 << target, 0);
-                        promising_level -= Bot2_2::bishop_placement_score(1 << origin, 0);
+                        promising_level += Bot2_4::bishop_placement_score(1 << target, 0);
+                        promising_level -= Bot2_4::bishop_placement_score(1 << origin, 0);
                     }
                 }
 
@@ -255,6 +258,14 @@ impl Bot2_2 {
         return score;
     }
 
+    fn pawn_structure_score(pawns:u64){
+
+        //bonus for pawns protecting each other??
+        //penalty for backwards pawns
+        //penalty for isolated pawns
+        //bonus for passed pawns(wait with this to endgame factor??)
+    }
+
     fn bishop_placement_score(bishops:u64, color:usize) -> i32{
         let mut score:i32 = 0;
         score += u64::count_ones(bishops & TOP_TIER_BISHOP[color]) as i32 * 2;
@@ -286,10 +297,53 @@ impl Bot2_2 {
         return score;
     }
 
-    fn evaluate(&mut self, bit_board_state:&mut BitBoardState) -> i32{
-        self.num_pos += 1;
+    fn dynamic_piece_count(pieces:&[u64; 6], other_pieces:&[u64; 6]) -> i32{
+        let mut piece_count:i32 = 0;
+
+        //default value for pieces
+        const VALUE_PAWN:i32 = 100;
+        const VALUE_KNIGHT:i32 = 300;
+        const VALUE_BISHOP:i32 = 320;
+        const VALUES_ROOK:[i32; 10] = [500, 900, 1300, 1700, 2100, 2500, 2900, 3300, 3600, 3900];
+        const VALUE_QUEEN:i32 = 900;
+
+        //number of piece type for self color
+        let num_pawns = u64::count_ones(pieces[PAWN]) as i32;
+        let num_knights = u64::count_ones(pieces[KNIGHT]) as i32;
+        let num_bishops = u64::count_ones(pieces[BISHOP]) as i32;
+        let num_rooks = u64::count_ones(pieces[ROOK]) as i32;
+        let num_queens = u64::count_ones(pieces[QUEEN]) as i32;
+
+        //number of total pawns, both black and white
+        let total_pawns = u64::count_ones(other_pieces[PAWN])as i32+num_pawns;
+
+        //pawns
+        piece_count += num_pawns*VALUE_PAWN;
+
+
+        //knights are worth more in a closed position(more pawns)
+        piece_count += num_knights*(VALUE_KNIGHT+total_pawns);
+
+
+        //bishops are worth more in an endgame(less pawns)
+        piece_count += num_bishops*(VALUE_BISHOP-total_pawns);
+
+
+        //rooks: rooks decrease in value when having more, two are worth as much as a queen
+        piece_count += VALUES_ROOK[num_rooks as usize];
 
         
+        //queens
+        piece_count += num_queens*VALUE_QUEEN;
+
+        return piece_count;
+    }
+
+
+    fn evaluate(&mut self, bit_board_state:&BitBoardState) -> i32{
+        self.num_pos += 1;
+
+        //calculate end game factor(but how??)
 
         let pieces = bit_board_state.piece_bb();
         let piece_mask:u64 = bit_board_state.piece_mask();
@@ -299,23 +353,24 @@ impl Bot2_2 {
         let mut eval:i32 = 0;
         //eval += fastrand::i32(-5..5);
 
-        //eval += bit_board_state.piece_count()*10;
-        eval += self.capture_search(bit_board_state, i32::MIN, i32::MAX, 0, None)*10;
+        eval += Bot2_4::dynamic_piece_count(&pieces[WHITE], &pieces[BLACK]) -
+                Bot2_4::dynamic_piece_count(&pieces[BLACK], &pieces[WHITE]);
 
-
-        eval += (Bot2_2::pawn_placement_score(pieces[WHITE][PAWN], WHITE) - 
-                Bot2_2::pawn_placement_score(pieces[BLACK][PAWN], BLACK))
+        eval += (Bot2_4::pawn_placement_score(pieces[WHITE][PAWN], WHITE) - 
+                Bot2_4::pawn_placement_score(pieces[BLACK][PAWN], BLACK))
                 *3;
-        eval += (Bot2_2::knight_placement_score(pieces[WHITE][KNIGHT]) -
-                Bot2_2::knight_placement_score(pieces[BLACK][KNIGHT]))
-                *5;
-        eval += (Bot2_2::bishop_placement_score(pieces[WHITE][BISHOP], WHITE) -
-                Bot2_2::bishop_placement_score(pieces[BLACK][BISHOP], BLACK))
-                *15;
-        eval += (Bot2_2::rook_score(pieces[WHITE][ROOK], pieces[WHITE][PAWN], piece_mask) -
-                Bot2_2::rook_score(pieces[BLACK][ROOK], pieces[BLACK][PAWN], piece_mask)
-                )*20;
 
+        eval += (Bot2_4::knight_placement_score(pieces[WHITE][KNIGHT]) -
+                Bot2_4::knight_placement_score(pieces[BLACK][KNIGHT]))
+                *5;
+
+        eval += (Bot2_4::bishop_placement_score(pieces[WHITE][BISHOP], WHITE) -
+                Bot2_4::bishop_placement_score(pieces[BLACK][BISHOP], BLACK))
+                *15;
+
+        eval += (Bot2_4::rook_score(pieces[WHITE][ROOK], pieces[WHITE][PAWN], piece_mask) -
+                Bot2_4::rook_score(pieces[BLACK][ROOK], pieces[BLACK][PAWN], piece_mask)
+                )*20;
 
         return eval;
     }
@@ -337,8 +392,8 @@ impl Bot2_2 {
         }
     }
 
-    //returns the piece count after a series of best captures
-    //for now very basic implementation
+    //finsishes the search by looking at any captures in a position, and subsequent "capture-backs" on the same square
+    //all nodes are evaluated, a node will then be evaluated as the min/max of its children and itself
     fn capture_search(&mut self, bit_board_state:&mut BitBoardState, mut alpha:i32, mut beta:i32, capture_depth:usize, opt_capture_square:Option<u8>) -> i32{
 
         //Not directly related to piece count but should work
@@ -353,7 +408,7 @@ impl Bot2_2 {
         let mut moves = bit_board_state.gen_moves_legal().moves_vec();
 
         moves.retain(|m|{
-            Bot2_2::is_capture(bit_board_state, m)
+            Bot2_4::is_capture(bit_board_state, m)
         });
         //moves should only contain captures at this point
 
@@ -364,10 +419,10 @@ impl Bot2_2 {
                 m.target() == capture_square
             });
         }
-
+        let this_eval = self.evaluate(bit_board_state);
         //if there are no more captures available, return the piece count
         if moves.len() == 0 {
-            return bit_board_state.piece_count();
+            return this_eval;
         }
 
         moves.sort_by(|a, b| 
@@ -377,8 +432,8 @@ impl Bot2_2 {
             );
 
         //at worst either player can choose to not capture
-        let mut min = bit_board_state.piece_count();
-        let mut max = bit_board_state.piece_count();
+        let mut min = this_eval;
+        let mut max = this_eval;
 
 
         for capture in moves{
@@ -435,7 +490,7 @@ impl Bot2_2 {
         
         if depth <= 0 || true_depth >= self.max_depth{
             match_history.pop();
-            return (self.evaluate(bit_board_state), ChessMove::new_empty());
+            return (self.capture_search(bit_board_state, alpha, beta, 0, None), ChessMove::new_empty());
         }
         let mut moves = bit_board_state.gen_moves_legal().moves_vec();
 
@@ -581,7 +636,7 @@ impl Bot2_2 {
 }
 
 
-impl Clone for Bot2_2{
+impl Clone for Bot2_4{
     fn clone(&self) -> Self {
         Self {  
             search_depth: self.search_depth,
@@ -597,4 +652,4 @@ impl Clone for Bot2_2{
         }
     }
 }
-//impl Copy for Bot2_2{}
+//impl Copy for Bot2_4{}

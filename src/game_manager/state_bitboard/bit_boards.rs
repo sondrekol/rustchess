@@ -65,6 +65,17 @@ pub const WEST_OF:[u64; 8] = [ //Indexed by file
     FILE_A | FILE_B | FILE_C | FILE_D | FILE_E | FILE_F | FILE_G | FILE_H,
 ];
 
+pub const NEIGHBOUR_FILES:[u64; 8] = [
+    FILE_B,
+    FILE_A | FILE_C,
+    FILE_B | FILE_D,
+    FILE_C | FILE_E,
+    FILE_D | FILE_F,
+    FILE_E | FILE_G,
+    FILE_F | FILE_H,
+    FILE_G
+];
+
 pub const CASTLE_W_K_LINE:u64 = 0x0000000000000060;
 pub const CASTLE_W_Q_LINE:u64 = 0x000000000000000E;
 pub const CASTLE_B_K_LINE:u64 = 0x6000000000000000;
@@ -319,6 +330,8 @@ pub fn rank_of(square: usize) -> u64{
 }
 
 
+
+
 static mut ROOK_MOVES:[u64; ROOK_MAP_SIZE] = [0;ROOK_MAP_SIZE];
 
 
@@ -400,4 +413,24 @@ pub const TOP_TIER_BISHOP:[u64; 2] = [
 pub const SEC_TIER_BISHOP:[u64; 2] = [
     0x24422424422400,
     0x24422424422400
+];
+
+
+pub const KING_PAWNS_OPTIMAL:[[u64; 8]; 2] = [
+ [0x300,
+ 0x700,
+ 0xe00,
+ 0x1c00,
+ 0x3800,
+ 0x7000,
+ 0xe000,
+ 0xc000],
+ [0x3000000000000,
+ 0x7000000000000,
+ 0xe000000000000,
+ 0x1c000000000000,
+ 0x38000000000000,
+ 0x70000000000000,
+ 0xe0000000000000,
+ 0xc0000000000000]
 ];

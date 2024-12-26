@@ -13,9 +13,8 @@ use piston::event_loop::{EventSettings, Events};
 use piston::input::{RenderArgs, RenderEvent, UpdateArgs};
 use piston::window::WindowSettings;
 use piston::{
-    Button, MouseButton, ButtonEvent, MouseCursorEvent, ButtonState, UpdateEvent
+    Button, ButtonEvent, MouseCursorEvent, ButtonState, UpdateEvent
 };
-use graphics::{Image, clear};
 use std::collections::HashMap;
 
 
@@ -142,6 +141,7 @@ impl App {
         if self.game_manager.update(){
 
             self.board_graphic_state = self.game_manager.get_board();
+            self.piece_in_hand = 0;
         }
     }
 
@@ -153,7 +153,7 @@ impl App {
 
     fn pick_up_piece(&mut self){
         let (x, y) = self.cursor_board_coordinates();
-        if(x < 8 && y < 8){
+        if x < 8 && y < 8 {
             self.piece_in_hand = self.board_graphic_state[x][y];
             self.board_graphic_state[x][y] = 0;
         }
@@ -230,16 +230,16 @@ fn main() {
         }
         if let Some(args) = e.button_args(){
             if args.button == Button::Keyboard(piston::Key::Q){
-                app.promotion_piece = Some(0b00000100);
-            }
-            if args.button == Button::Keyboard(piston::Key::R){
                 app.promotion_piece = Some(0b00000011);
             }
-            if args.button == Button::Keyboard(piston::Key::B){
+            if args.button == Button::Keyboard(piston::Key::R){
                 app.promotion_piece = Some(0b00000010);
             }
-            if args.button == Button::Keyboard(piston::Key::N){
+            if args.button == Button::Keyboard(piston::Key::B){
                 app.promotion_piece = Some(0b00000001);
+            }
+            if args.button == Button::Keyboard(piston::Key::N){
+                app.promotion_piece = Some(0b00000000);
             }
             if args.button == Button::Keyboard(piston::Key::R) && args.state == ButtonState::Press{
                 app.reverse_board = !app.reverse_board;

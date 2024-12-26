@@ -1,10 +1,14 @@
 
+use std::{hash::{Hash, Hasher}, fmt};
 
+use super::move_string::lan_move;
 
 
 
 
 //Piece codes
+
+
 
 
 
@@ -39,22 +43,52 @@ const NO_EN_PASSANT_SQUARE:u8 = 0x80;
 
 
 //Move flags:
-const PROMOTE_TO_KNIGHT:u8 = 0b0000;
-const PROMOTE_TO_BISHOP:u8 = 0b0001;
-const PROMOTE_TO_ROOK:u8 = 0b0010;
-const PROMOTE_TO_QUEEN:u8 = 0b0011;
+pub const PROMOTE_TO_KNIGHT:u8 = 0b0000;
+pub const PROMOTE_TO_BISHOP:u8 = 0b0001;
+pub const PROMOTE_TO_ROOK:u8 = 0b0010;
+pub const PROMOTE_TO_QUEEN:u8 = 0b0011;
 
-const W_CASTLE_KING:u8 = 0b0100;
-const W_CASTLE_QUEEN:u8 = 0b0101;
-const B_CASTLE_KING:u8 = 0b0110;
-const B_CASTLE_QUEEN:u8 = 0b0111;
+pub const W_CASTLE_KING:u8 = 0b0100;
+pub const W_CASTLE_QUEEN:u8 = 0b0101;
+pub const B_CASTLE_KING:u8 = 0b0110;
+pub const B_CASTLE_QUEEN:u8 = 0b0111;
 
-const WHITE_EN_PASSANT:u8 = 0b1000;
-const BLACK_EN_PASSANT:u8 = 0b1001;
+pub const WHITE_EN_PASSANT:u8 = 0b1000;
+pub const BLACK_EN_PASSANT:u8 = 0b1001;
 
-const DOUBLE_PAWN_MOVE:u8 = 0b1010;
+pub const DOUBLE_PAWN_MOVE:u8 = 0b1010;
 
-const NO_FLAG:u8 = 0b1111;
+pub const NO_FLAG:u8 = 0b1111;
+
+
+pub static VERTICAL_DISTANCE:[[u8; 64];64] = {
+    let mut dis:[[u8; 64];64] = [[0; 64];64];
+    let mut i:u8 = 0;
+    
+    while i < 64{
+        let mut j:u8 = 0;
+        while j < 64{
+            dis[i as usize][j as usize] = BoardState::vertical_distance(i, j);
+            j+=1;
+        }
+        i+=1;
+    }
+    dis
+};
+pub static HORIZONTAL_DISTANCE:[[u8; 64];64] = {
+    let mut dis:[[u8; 64];64] = [[0; 64];64];
+    let mut i:u8 = 0;
+    
+    while i < 64{
+        let mut j:u8 = 0;
+        while j < 64{
+            dis[i as usize][j as usize] = BoardState::horizontal_distance(i, j);
+            j+=1;
+        }
+        i+=1;
+    }
+    dis
+};
 
 #[derive(PartialEq)]
 pub enum GameState{
@@ -65,11 +99,15 @@ pub enum GameState{
 }
 
 
-
 pub struct ChessMove{
-    move_data:u16
+    move_data:u16,
+    promising_level:i16
 }
-
+impl Hash for ChessMove{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.move_data.hash(state);
+    }
+}
 pub struct ChessMoveList{
     index: u8,
     chess_moves: [ChessMove; 218]
@@ -78,6 +116,7 @@ pub struct ChessMoveList{
 
 pub struct BoardState{
     pieces: [u8; 64],
+    pieces_backup: [u8; 64],
     /*
     Indexes:
     a1 = 0
@@ -96,7 +135,13 @@ pub struct BoardState{
 
 
     castle_rights: u8,
-    half_move_clock: u8
+    half_move_clock: u8,
+    is_in_check: Option<bool>,
+    legal_moves: Option<ChessMoveList>,
+    white_king: usize,
+    black_king: usize,
+    move_history: Vec<ChessMove>,
+    piece_history: Vec<[u8; 64]>
 
 }
 
@@ -109,14 +154,25 @@ impl ChessMove{
     last 6 bits are the index of the origin square
      */
     pub fn new_empty() -> Self{
-        Self { move_data: 0 }
+        Self { 
+            move_data: 0,
+            promising_level: 0
+        }
+    }
+
+    pub fn new_exact(move_data:u16) -> Self{
+        Self { 
+            move_data: move_data,
+            promising_level: 0
+        }
     }
 
     pub fn from_indices(flags: u8, origin:u8, target: u8) -> Self{
         Self { 
             move_data:  (((flags as u16) & 0x0F) << 12) | 
                         (((target as u16) & 0x3F) << 6) | 
-                        (((origin as u16) & 0x3F))
+                        (((origin as u16) & 0x3F)),
+            promising_level: 0
         }
     }
 
@@ -138,25 +194,51 @@ impl ChessMove{
         return self.move_data == 0;
     }
 
+    pub fn move_data(&self) -> u16{
+        return self.move_data;
+    }
+
+    pub fn promising_level_mut(&mut self) -> &mut i16{
+        return &mut self.promising_level;
+    }
+
+    pub fn promising_level(&self) -> &i16{
+        return &self.promising_level;
+    }
+
 }
 
 impl Clone for ChessMove{
     fn clone(&self) -> Self {
-        Self { move_data: self.move_data }
+        Self { move_data: self.move_data , promising_level: self.promising_level}
     }
 }
 
 impl Copy for ChessMove{}
+
+impl fmt::Debug for ChessMove{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ChessMove")
+        .field("move", &lan_move(*self))
+        .field("flag", &self.flag())
+        .finish()
+    }
+}
 
 impl PartialEq for ChessMove {
     fn eq(&self, other: &Self) -> bool {
         self.move_data == other.move_data
     }
 }
+impl Eq for ChessMove {
+}
 
 impl ChessMoveList{
     pub fn new() -> Self{
-        Self { index: 0, chess_moves: [ChessMove{move_data: 0}; 218] }
+        Self {
+            index: 0, 
+            chess_moves: [ChessMove{move_data: 0, promising_level: 0}; 218]
+        }
     }
 
     pub fn add(&mut self, chess_move:ChessMove){
@@ -164,9 +246,14 @@ impl ChessMoveList{
         self.index += 1;
     }
 
+    pub fn add_no_alloc(&mut self, origin:u8, target:u8, flag:u8){
+        self.chess_moves[self.index as usize].move_data = origin as u16 | ((target as u16) << 6) | ((flag as u16) << 12);
+        self.index+= 1;
+    }
+
     pub fn pop(&mut self) -> ChessMove{
-        let result = self.chess_moves[self.index as usize];
         self.index -= 1;
+        let result = self.chess_moves[self.index as usize];
         return result;
     }
 
@@ -180,21 +267,37 @@ impl ChessMoveList{
         return size;
     }
 
+    //NOTE: this does not work if the moves are mutated
+    pub fn size_fast(&self) -> usize{
+        return self.index as usize;
+    }
+
     pub fn moves(&self) -> &[ChessMove; 218]{
         return &self.chess_moves;
     }
+    
     pub fn moves_vec(&self) -> Vec<ChessMove>{
-        let mut moves = Vec::<ChessMove>::new();
-        for i in 0..218{
+        let mut moves = Vec::<ChessMove>::with_capacity(218);
+        for i in 0..self.index as usize{
             if self.chess_moves[i].move_data != 0{
                 moves.push(self.chess_moves[i]);
             }
         }
         return moves;
     }
+
+    pub fn reset(&mut self) {
+        self.index = 0;
+    }
 }
 
+impl Clone for ChessMoveList{
+    fn clone(&self) -> Self {
+        Self { index: self.index.clone(), chess_moves: self.chess_moves.clone() }
+    }
+}
 
+impl Copy for ChessMoveList{}
 
 
 impl BoardState{
@@ -210,6 +313,8 @@ impl BoardState{
 
         let mut index:i32 = -1;
         let mut state:usize = 0;
+        let mut white_king = 0;
+        let mut black_king = 0;
         for c in fen.chars(){
 
             //Piece part
@@ -244,7 +349,14 @@ impl BoardState{
                 //TODO flip index horizontaly
                 let rank = 7-index/8;
                 let file = index%8;
-                pieces[(rank*8 + file) as usize] = to_add;
+                let piece_index = (rank*8 + file) as usize;
+                pieces[piece_index] = to_add;
+                if to_add == PIECE_BLACK | PIECE_KING {
+                    black_king = piece_index;
+                }
+                else if to_add == PIECE_WHITE | PIECE_KING {
+                    white_king = piece_index;
+                }
             }
             //to move
             else if state == 1{
@@ -304,10 +416,18 @@ impl BoardState{
         }
         return Self { 
             pieces: pieces, 
+            pieces_backup: pieces,
             white_to_move: to_move,
             en_passant_square: en_passant_square, 
             castle_rights: castle_rights,
-            half_move_clock: 0 }
+            half_move_clock: 0,
+            is_in_check: None,
+            legal_moves: None,
+            white_king: white_king,
+            black_king: black_king,
+            move_history: Vec::<ChessMove>::new(),
+            piece_history: Vec::<[u8; 64]>::new()
+        }
     }
 
     pub fn get_board(&self) -> [[i8; 8]; 8]{
@@ -347,6 +467,40 @@ impl BoardState{
         return graphic_board;
     }
 
+    pub fn equal_game_state(a:&BoardState, b:&BoardState) -> bool {
+        if a.pieces != b.pieces {
+            return false;
+        }
+        if a.en_passant_square != b.en_passant_square {
+            return false;
+        }
+        if a.castle_rights != b.castle_rights {
+            return false;
+        }
+        if a.half_move_clock != b.half_move_clock{
+            return false;
+        }
+        if a.white_to_move != b.white_to_move{
+            return false;
+        }
+        return true;
+    }
+    pub fn piece(&self, index: usize) -> u8{
+        return self.pieces[index];
+    }
+
+    pub fn castle_rights(&self) -> u8{
+        return self.castle_rights;
+    }
+
+    pub fn set_piece(&mut self, index: usize, piece: u8) {
+        self.pieces[index] = piece;
+    }
+
+    pub fn set_castle_rights(&mut self, castle_rights:u8){
+        self.castle_rights = castle_rights;
+    }
+
     fn valid_origin(&self, origin: u8) -> bool{
         let white_on_origin = self.pieces[origin as usize] & PIECE_WHITE != 0; 
         return white_on_origin == self.white_to_move;
@@ -357,15 +511,15 @@ impl BoardState{
         return self.pieces[a as usize] & PIECE_COLOR_MASK == self.pieces[b as usize] & PIECE_COLOR_MASK
     }
 
-    fn horizontal_distance(a: u8, b:u8) -> u8{
+    pub const fn horizontal_distance(a: u8, b:u8) -> u8{
         return ((a%8) as i8 - (b%8) as i8).abs() as u8;
     }
-    fn vertical_distance(a: u8, b:u8) -> u8{
+    pub const fn vertical_distance(a: u8, b:u8) -> u8{
         return ((a/8) as i8 - (b/8) as i8).abs() as u8;
     }
 
-    fn manhatten_distance(a:u8, b:u8) -> u8{
-        return BoardState::horizontal_distance(a, b) + BoardState::vertical_distance(a, b);
+    fn manhatten_distance(a:&u8, b:&u8) -> u8{
+        return (HORIZONTAL_DISTANCE[*a as usize][*b as usize] + VERTICAL_DISTANCE[*a as usize][*b as usize]) as u8;
     }
 
 
@@ -402,7 +556,7 @@ impl BoardState{
         if self.pieces[regular_move as usize] == 0 {
             add_pawn_move_promotion_checked(chess_moves, origin, regular_move as u8, self.white_to_move);
             if double_move >= 0 && double_move < 64{
-                if self.pieces[double_move as usize] == 0 {
+                if self.pieces[double_move as usize] == 0 && origin/8 == if self.white_to_move {1} else {6}{
                     //?Note that this move would create a 
                     chess_moves.add(
                         ChessMove::from_indices(
@@ -421,7 +575,7 @@ impl BoardState{
                 continue;
             }
             let target = target as u8;
-            if BoardState::manhatten_distance(origin, target) != 2{
+            if BoardState::manhatten_distance(&origin, &target) != 2{
                 continue;
             }
 
@@ -443,13 +597,15 @@ impl BoardState{
         for direction in [-17, -15, -10, -6, 6, 10, 15, 17]{
             let target = origin as i8+direction;
 
-            if BoardState::manhatten_distance(origin, target as u8) != 3{
-                continue;
-            }
-
             if target >= 64 || target < 0 {
                 continue;
             }
+
+            if BoardState::manhatten_distance(&origin, &(target as u8)) != 3{
+                continue;
+            }
+
+            
             if self.same_color(origin, target as u8) {
                 continue;
             }
@@ -470,7 +626,7 @@ impl BoardState{
                     break;
                 }
                 let target = target as u8;
-                if BoardState::horizontal_distance(origin, target) != BoardState::vertical_distance(origin, target) {
+                if HORIZONTAL_DISTANCE[origin as usize][target as usize] != VERTICAL_DISTANCE[origin as usize][target as usize] {
                     break;
                 }
 
@@ -509,7 +665,7 @@ impl BoardState{
                 }
                 let target = target as u8;
 
-                if BoardState::horizontal_distance(origin, target) != 0 && BoardState::vertical_distance(origin, target) != 0{
+                if HORIZONTAL_DISTANCE[origin as usize][target as usize] != 0 && VERTICAL_DISTANCE[origin as usize][target as usize] != 0{
                     break;
                 }
 
@@ -555,7 +711,7 @@ impl BoardState{
         return true;
     }
 
-    fn legal_castle_moves(&self, chess_moves:&mut ChessMoveList){
+    fn legal_castle_moves(&mut self, chess_moves:&mut ChessMoveList){
         let back_rank = if self.white_to_move {0} else {56};
         if self.is_in_check(self.white_to_move) {
             return;
@@ -589,14 +745,14 @@ impl BoardState{
         }
     }
 
-    fn pseudo_legal_king_moves(&self, chess_moves:&mut ChessMoveList, origin: u8){
+    fn pseudo_legal_king_moves(&mut self, chess_moves:&mut ChessMoveList, origin: u8){
         for direction in [1, -1, 8, -8, 7, -7, 9, -9]{
             let target = origin as i8+direction;
             if target >= 64 || target < 0{
                 continue;
             }
             let target = target as u8;
-            if BoardState::manhatten_distance(origin, target) > 2 {
+            if BoardState::manhatten_distance(&origin, &target) > 2 {
                 continue;
             }
             if self.same_color(origin, target){
@@ -616,7 +772,7 @@ impl BoardState{
         self.legal_castle_moves(chess_moves);
     }
 
-    fn pseudo_legal_moves(&self) -> ChessMoveList{
+    fn pseudo_legal_moves(&mut self) -> ChessMoveList{
         let mut chess_moves = ChessMoveList::new();
         for i in 0..64{
             let i = i;
@@ -636,96 +792,163 @@ impl BoardState{
         }
         return chess_moves;
     }
-    //Missing "can not castle out of check rule"
-    //?Implement in legal_moves() or pseudo_legal_king_moves() ?????
-    pub fn legal_moves(&self) -> ChessMoveList{
+    pub fn is_illegal(&mut self, chess_move:ChessMove) -> bool{
+        let mut is_illegal = false;
+        //Make move
+        let captured_piece = self.pieces[chess_move.target() as usize];
+        let castle_rights = self.castle_rights;
+        self.perform_move_mutable(chess_move);
+
+        if self.is_in_check(!self.white_to_move){
+            is_illegal = true;
+        }
+        self.undo_move_mutable(chess_move);
+        self.pieces[chess_move.target() as usize] = captured_piece;
+        self.castle_rights = castle_rights;
+        return is_illegal;
+    }
+
+    pub fn legal_moves_gen(&mut self) -> ChessMoveList{
         let mut moves = self.pseudo_legal_moves();
         for i in 0..218{
             if moves.chess_moves[i].move_data == 0 {
                 continue;
             }
-            let new_board_state = self.perform_move(moves.chess_moves[i]);
-            if new_board_state.is_in_check(self.white_to_move){
-                moves.chess_moves[i].move_data = 0;
-            }
+            let chess_move = moves.chess_moves[i];
+
+            if self.is_illegal(chess_move){moves.chess_moves[i].move_data = 0;}
         }
         return moves;
+    }
+
+    pub fn no_legal_moves(&mut self) -> bool{
+        self.legal_moves = Some(ChessMoveList::new());
+        let mut chess_moves = self.legal_moves.unwrap();
+        for i in 0..64{
+            let i = i;
+            if (self.pieces[i] & PIECE_COLOR_MASK == PIECE_WHITE) != self.white_to_move{
+                continue;
+            }
+            match self.pieces[i] & PIECE_TYPE_MASK{
+                0 => {continue;}
+                PIECE_PAWN => {self.pseudo_legal_pawn_moves(&mut chess_moves, i as u8)}
+                PIECE_KNIGHT => {self.pseudo_legal_knight_moves(&mut chess_moves, i as u8)}
+                PIECE_BISHOP => {self.pseudo_legal_bishop_moves(&mut chess_moves, i as u8)}
+                PIECE_ROOK => {self.pseudo_legal_rook_moves(&mut chess_moves, i as u8)}
+                PIECE_QUEEN => {self.pseudo_legal_queen_moves(&mut chess_moves, i as u8)}
+                PIECE_KING => {self.pseudo_legal_king_moves(&mut chess_moves, i as u8)}
+                _ => {println!("INVALID PIECE")}
+            }
+            while chess_moves.index > 0 {
+                let chess_move = chess_moves.pop();
+                if self.is_illegal(chess_move) {
+                    continue;
+                }else{
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    pub fn legal_moves(&mut self) -> ChessMoveList{
+        if self.legal_moves.is_none(){
+            self.legal_moves = Some(self.legal_moves_gen());
+        }
+        return self.legal_moves.unwrap();
     }
     
     //Blindly perform a move, and updates the board state. Does not check for legality
     pub fn perform_move(&self, chess_move:ChessMove) -> BoardState{
+        let mut new_board_state = self.clone();
+        new_board_state.perform_move_mutable(chess_move);
+        return new_board_state;
+    }
+    pub fn perform_move_mutable(&mut self, chess_move:ChessMove){
+        //self.move_history.push(chess_move);
+        //self.piece_history.push(self.pieces);
 
         let flag = chess_move.flag();
         let origin = chess_move.origin();
         let target = chess_move.target();
 
-        let mut new_board_state = BoardState::clone(&self);
+        self.legal_moves = None;
+        self.is_in_check = None;
 
 
         match flag {
             NO_FLAG => {
-                new_board_state.pieces[target as usize] = new_board_state.pieces[origin as usize];
-                new_board_state.pieces[origin as usize] = 0;
+                self.pieces[target as usize] = self.pieces[origin as usize];
+                self.pieces[origin as usize] = 0;
+                if self.pieces[target as usize] == PIECE_WHITE | PIECE_KING{
+                    self.white_king = target as usize;
+                }else if self.pieces[target as usize] == PIECE_BLACK | PIECE_KING{
+                    self.black_king = target as usize;
+                }
             }
             DOUBLE_PAWN_MOVE => {
-                new_board_state.pieces[target as usize] = new_board_state.pieces[origin as usize];
-                new_board_state.pieces[origin as usize] = 0;
-                new_board_state.en_passant_square = if self.white_to_move {origin+8} else {origin-8};
+                self.pieces[target as usize] = self.pieces[origin as usize];
+                self.pieces[origin as usize] = 0;
+                self.en_passant_square = if self.white_to_move {origin+8} else {origin-8};
             }
             W_CASTLE_KING => {
-                new_board_state.pieces[4] = 0;
-                new_board_state.pieces[7] = 0;
-                new_board_state.pieces[5] = PIECE_WHITE | PIECE_ROOK;
-                new_board_state.pieces[6] = PIECE_WHITE | PIECE_KING;
-                new_board_state.castle_rights &= 0xFC;
+                self.pieces[4] = 0;
+                self.pieces[7] = 0;
+                self.pieces[5] = PIECE_WHITE | PIECE_ROOK;
+                self.pieces[6] = PIECE_WHITE | PIECE_KING;
+                self.castle_rights &= 0xFC;
+                self.white_king = 6;
             }
             W_CASTLE_QUEEN => {
-                new_board_state.pieces[4] = 0;
-                new_board_state.pieces[0] = 0;
-                new_board_state.pieces[3] = PIECE_WHITE | PIECE_ROOK;
-                new_board_state.pieces[2] = PIECE_WHITE | PIECE_KING;
-                new_board_state.castle_rights &= 0xFC
+                self.pieces[4] = 0;
+                self.pieces[0] = 0;
+                self.pieces[3] = PIECE_WHITE | PIECE_ROOK;
+                self.pieces[2] = PIECE_WHITE | PIECE_KING;
+                self.castle_rights &= 0xFC;
+                self.white_king = 2;
             }
             B_CASTLE_KING => {
-                new_board_state.pieces[60] = 0;
-                new_board_state.pieces[63] = 0;
-                new_board_state.pieces[61] = PIECE_BLACK | PIECE_ROOK;
-                new_board_state.pieces[62] = PIECE_BLACK | PIECE_KING;
-                new_board_state.castle_rights &= 0x03
+                self.pieces[60] = 0;
+                self.pieces[63] = 0;
+                self.pieces[61] = PIECE_BLACK | PIECE_ROOK;
+                self.pieces[62] = PIECE_BLACK | PIECE_KING;
+                self.castle_rights &= 0x03;
+                self.black_king = 62;
             }
             B_CASTLE_QUEEN => {
-                new_board_state.pieces[60] = 0;
-                new_board_state.pieces[56] = 0;
-                new_board_state.pieces[59] = PIECE_BLACK | PIECE_ROOK;
-                new_board_state.pieces[58] = PIECE_BLACK | PIECE_KING;
-                new_board_state.castle_rights &= 0x03;
+                self.pieces[60] = 0;
+                self.pieces[56] = 0;
+                self.pieces[59] = PIECE_BLACK | PIECE_ROOK;
+                self.pieces[58] = PIECE_BLACK | PIECE_KING;
+                self.castle_rights &= 0x03;
+                self.black_king = 58;
             }
             PROMOTE_TO_BISHOP => {
-                new_board_state.pieces[origin as usize] = 0;
-                new_board_state.pieces[target as usize] =  if self.white_to_move {PIECE_WHITE} else {PIECE_BLACK} | PIECE_BISHOP;
+                self.pieces[origin as usize] = 0;
+                self.pieces[target as usize] =  if self.white_to_move {PIECE_WHITE} else {PIECE_BLACK} | PIECE_BISHOP;
             }
             PROMOTE_TO_KNIGHT => {
-                new_board_state.pieces[origin as usize] = 0;
-                new_board_state.pieces[target as usize] =  if self.white_to_move {PIECE_WHITE} else {PIECE_BLACK} | PIECE_KNIGHT;
+                self.pieces[origin as usize] = 0;
+                self.pieces[target as usize] =  if self.white_to_move {PIECE_WHITE} else {PIECE_BLACK} | PIECE_KNIGHT;
             }
             PROMOTE_TO_QUEEN => {
-                new_board_state.pieces[origin as usize] = 0;
-                new_board_state.pieces[target as usize] =  if self.white_to_move {PIECE_WHITE} else {PIECE_BLACK} | PIECE_QUEEN;
+                self.pieces[origin as usize] = 0;
+                self.pieces[target as usize] =  if self.white_to_move {PIECE_WHITE} else {PIECE_BLACK} | PIECE_QUEEN;
             }
             PROMOTE_TO_ROOK => {
-                new_board_state.pieces[origin as usize] = 0;
-                new_board_state.pieces[target as usize] =  if self.white_to_move {PIECE_WHITE} else {PIECE_BLACK} | PIECE_ROOK;
+                self.pieces[origin as usize] = 0;
+                self.pieces[target as usize] =  if self.white_to_move {PIECE_WHITE} else {PIECE_BLACK} | PIECE_ROOK;
             }
             BLACK_EN_PASSANT => {
-                new_board_state.pieces[target as usize] = new_board_state.pieces[origin as usize];
-                new_board_state.pieces[origin as usize] = 0;
-                new_board_state.pieces[(target + 8) as usize] = 0;
+                self.pieces[target as usize] = self.pieces[origin as usize];
+                self.pieces[origin as usize] = 0;
+                self.pieces[(target + 8) as usize] = 0;
 
             }
             WHITE_EN_PASSANT => {
-                new_board_state.pieces[target as usize] = new_board_state.pieces[origin as usize];
-                new_board_state.pieces[origin as usize] = 0;
-                new_board_state.pieces[(target - 8) as usize] = 0;
+                self.pieces[target as usize] = self.pieces[origin as usize];
+                self.pieces[origin as usize] = 0;
+                self.pieces[(target - 8) as usize] = 0;
 
             }
             _ => {println!("INVALID MOVE FLAG")}
@@ -733,33 +956,105 @@ impl BoardState{
 
         //remove castle rights if one of the involved pieces is 
         match target {
-            0 => {new_board_state.castle_rights &= 0b1101}
-            7 => {new_board_state.castle_rights &= 0b1110}
-            54 => {new_board_state.castle_rights &= 0b0111}
-            63 => {new_board_state.castle_rights &= 0b1011}
-            4 => {new_board_state.castle_rights &= 0b1100}
-            60 => {new_board_state.castle_rights &= 0b0011}
+            0 => {self.castle_rights &= 0b1101}
+            7 => {self.castle_rights &= 0b1110}
+            54 => {self.castle_rights &= 0b0111}
+            63 => {self.castle_rights &= 0b1011}
+            4 => {self.castle_rights &= 0b1100}
+            60 => {self.castle_rights &= 0b0011}
             _ => {}
         }
         match origin {
-            0 => {new_board_state.castle_rights &= 0b1101}
-            7 => {new_board_state.castle_rights &= 0b1110}
-            54 => {new_board_state.castle_rights &= 0b0111}
-            63 => {new_board_state.castle_rights &= 0b1011}
-            4 => {new_board_state.castle_rights &= 0b1100}
-            60 => {new_board_state.castle_rights &= 0b0011}
+            0 => {self.castle_rights &= 0b1101}
+            7 => {self.castle_rights &= 0b1110}
+            54 => {self.castle_rights &= 0b0111}
+            63 => {self.castle_rights &= 0b1011}
+            4 => {self.castle_rights &= 0b1100}
+            60 => {self.castle_rights &= 0b0011}
             _ => {}
         }
 
         //If the en passsant square was not set this halfmove, then we should remove it, as it is old
         if flag != DOUBLE_PAWN_MOVE {
-            new_board_state.en_passant_square = NO_EN_PASSANT_SQUARE;
+            self.en_passant_square = NO_EN_PASSANT_SQUARE;
         }
-        new_board_state.white_to_move = !new_board_state.white_to_move;
-        new_board_state.half_move_clock += 1;
+        self.white_to_move = !self.white_to_move;
+        self.half_move_clock += 1;
 
+    }
 
-        return new_board_state;
+    pub fn undo_move_mutable(&mut self, chess_move:ChessMove){
+        //self.move_history.pop();
+        //self.piece_history.pop();
+        let flag = chess_move.flag();
+        let origin = chess_move.origin();
+        let target = chess_move.target();
+
+        self.legal_moves = None;
+        self.is_in_check = None;
+
+        self.white_to_move = !self.white_to_move;
+        self.half_move_clock -= 1;
+
+        match flag {
+            NO_FLAG => {
+                self.pieces[origin as usize] = self.pieces[target as usize];
+                if self.pieces[origin as usize] == PIECE_WHITE | PIECE_KING{
+                    self.white_king = origin as usize;
+                }else if self.pieces[origin as usize] == PIECE_BLACK | PIECE_KING{
+                    self.black_king = origin as usize;
+                }
+            }
+            DOUBLE_PAWN_MOVE => {
+                self.pieces[origin as usize] = self.pieces[target as usize];
+                self.en_passant_square = NO_EN_PASSANT_SQUARE;
+            }
+            W_CASTLE_KING => {
+                self.pieces[6] = 0;
+                self.pieces[5] = 0;
+                self.pieces[7] = PIECE_WHITE | PIECE_ROOK;
+                self.pieces[4] = PIECE_WHITE | PIECE_KING;
+                self.white_king = 4;
+            }
+            W_CASTLE_QUEEN => {
+                self.pieces[2] = 0;
+                self.pieces[3] = 0;
+                self.pieces[0] = PIECE_WHITE | PIECE_ROOK;
+                self.pieces[4] = PIECE_WHITE | PIECE_KING;
+                self.white_king = 4;
+            }
+            B_CASTLE_KING => {
+                self.pieces[62] = 0;
+                self.pieces[61] = 0;
+                self.pieces[63] = PIECE_BLACK | PIECE_ROOK;
+                self.pieces[60] = PIECE_BLACK | PIECE_KING;
+                self.black_king = 60;
+            }
+            B_CASTLE_QUEEN => {
+                self.pieces[58] = 0;
+                self.pieces[59] = 0;
+                self.pieces[56] = PIECE_BLACK | PIECE_ROOK;
+                self.pieces[60] = PIECE_BLACK | PIECE_KING;
+                self.black_king = 60;
+            }
+            BLACK_EN_PASSANT => {
+                self.pieces[origin as usize] = self.pieces[target as usize];
+                self.pieces[target as usize] = 0;
+                self.pieces[(target + 8) as usize] = PIECE_WHITE | PIECE_PAWN;
+
+            }
+            WHITE_EN_PASSANT => {
+                self.pieces[origin as usize] = self.pieces[target as usize];
+                self.pieces[target as usize] = 0;
+                self.pieces[(target - 8) as usize] = PIECE_BLACK | PIECE_PAWN;
+
+            }
+            PROMOTE_TO_BISHOP | PROMOTE_TO_KNIGHT | PROMOTE_TO_QUEEN | PROMOTE_TO_ROOK => {
+                self.pieces[origin as usize] = if self.white_to_move {PIECE_WHITE | PIECE_PAWN} else {PIECE_BLACK | PIECE_PAWN};
+            }
+            _ => {println!("INVALID MOVE FLAG")}
+        }
+
     }
 
     fn is_attacked(&self, square:u8, attacked_by:bool) -> bool{
@@ -787,14 +1082,15 @@ impl BoardState{
         //check for knights
         for direction in [-17, -15, -10, -6, 6, 10, 15, 17]{
             let target = square as i8+direction;
-
-            if BoardState::manhatten_distance(square, target as u8) != 3{
-                continue;
-            }
-
             if target >= 64 || target < 0 {
                 continue;
             }
+
+            if BoardState::manhatten_distance(&square, &(target as u8)) != 3{
+                continue;
+            }
+
+            
             if self.pieces[target as usize] == attacker_color | PIECE_KNIGHT{
                 return true;
             }
@@ -809,16 +1105,20 @@ impl BoardState{
                     break;
                 }
                 let target = target as u8;
-                if BoardState::horizontal_distance(square, target) != BoardState::vertical_distance(square, target) {
+                if HORIZONTAL_DISTANCE[square as usize][target as usize] != VERTICAL_DISTANCE[square as usize][target as usize] {
                     break;
                 }
 
                 if self.same_color(square, target){
                     break;
                 }
+
                 if self.pieces[target as usize] == attacker_color | PIECE_BISHOP ||
                     self.pieces[target as usize] == attacker_color | PIECE_QUEEN{
                     return true;
+                }
+                if self.pieces[target as usize] != 0{
+                    break;
                 }
             }
         }
@@ -832,7 +1132,7 @@ impl BoardState{
                 }
                 let target = target as u8;
 
-                if BoardState::horizontal_distance(square, target) != 0 && BoardState::vertical_distance(square, target) != 0{
+                if HORIZONTAL_DISTANCE[square as usize][target as usize] != 0 && VERTICAL_DISTANCE[square as usize][target as usize] != 0{
                     break;
                 }
 
@@ -851,26 +1151,45 @@ impl BoardState{
             }
         }
 
+        //check king
+        for direction in [1, -1, 7, 8, 9, -7, -8, -9]{
+            let target = square as i8+direction;
+            if target >= 64 || target < 0{
+                continue;
+            }
+            let target = target as u8;
+
+            if HORIZONTAL_DISTANCE[square as usize][target as usize] > 1 || VERTICAL_DISTANCE[square as usize][target as usize] > 1{
+                continue;
+            }
+
+            if self.same_color(square, target){
+                continue;
+            }
+            else {
+                if self.pieces[target as usize] == attacker_color | PIECE_KING{
+                    return true;
+                }
+            }
+            
+        }
+
 
         return false;
     }
 
     fn king_pos(&self, color:bool) -> usize{
-        let mut king_pos = 0;
-        let piece_color = if color {PIECE_WHITE} else {PIECE_BLACK};
-        for i in 0..64{
-            if self.pieces[i] == piece_color | PIECE_KING{
-                return i;
-            }
+        return if color {self.white_king} else {self.black_king}
+    }
+
+    fn is_in_check(&mut self, color:bool) -> bool{
+        if self.is_in_check.is_none(){
+            self.is_in_check = Some(self.is_attacked(self.king_pos(color) as u8, !color));
         }
-        return 10000;
+        return self.is_in_check.unwrap();
     }
 
-    fn is_in_check(&self, color:bool) -> bool{
-        return self.is_attacked(self.king_pos(color) as u8, !color);
-    }
-
-    pub fn perform_move_api(&self, mut origin:u8, mut target: u8, promote_to: u8) -> Option<BoardState>{
+    pub fn perform_move_api(&mut self, mut origin:u8, mut target: u8, promote_to: u8) -> Option<BoardState>{
 
         //if pawn move:
             //check for en passant
@@ -928,18 +1247,14 @@ impl BoardState{
         let mut chess_move:ChessMove;
         //TODO: create ChessMove
         chess_move = ChessMove{
-            move_data: (flag as u16) << 12 | origin as u16 | (target as u16) << 6
+            move_data: (flag as u16) << 12 | origin as u16 | (target as u16) << 6,
+            promising_level: 0
         };
         let legal_moves = self.legal_moves().chess_moves;
 
 
         // !DEBUG STUFF
-        let mut legal_moves_debug:[[u8; 3]; 218] = [[0; 3]; 218];
-        for i in 0..218{
-            legal_moves_debug[i][0] = legal_moves[i].flag();
-            legal_moves_debug[i][1] = legal_moves[i].origin();
-            legal_moves_debug[i][2] = legal_moves[i].target();
-        }   
+        let mut legal_moves_debug = self.legal_moves_debug();  
         // !DEBUG STUFF
 
         for legal_move in legal_moves{
@@ -950,14 +1265,25 @@ impl BoardState{
         return None;
     }
 
-    pub fn legal_move_count(&self) -> usize{
+    pub fn legal_moves_debug(&mut self) -> [[u8; 3]; 218]{
+        let legal_moves = self.legal_moves().chess_moves;
+        let mut legal_moves_debug:[[u8; 3]; 218] = [[0; 3]; 218];
+        for i in 0..218{
+            legal_moves_debug[i][0] = legal_moves[i].flag();
+            legal_moves_debug[i][1] = legal_moves[i].origin();
+            legal_moves_debug[i][2] = legal_moves[i].target();
+        }  
+        return legal_moves_debug;
+    }
+
+    pub fn legal_move_count(&mut self) -> usize{
         let moves = self.legal_moves();
         return moves.size();
 
     }
 
-    pub fn game_state(&self) -> GameState{
-        if self.legal_move_count() == 0{
+    pub fn game_state(&mut self) -> GameState{
+        if self.no_legal_moves(){
             if self.white_to_move && self.is_in_check(self.white_to_move){
                 return GameState::Black;
             }else if  self.is_in_check(self.white_to_move){
@@ -969,7 +1295,7 @@ impl BoardState{
         return GameState::Playing;
     }
 
-    pub fn has_ended(&self) -> bool {
+    pub fn has_ended(&mut self) -> bool {
         return self.game_state() != GameState::Playing;
     }
 
@@ -1003,18 +1329,51 @@ impl BoardState{
         return piece_count;
     }
 
+    pub fn piece_value(&self, square: u8) -> f64{
+        let mut value:f64 = 0.0;
+        match self.pieces[square as usize] & PIECE_TYPE_MASK{
+            PIECE_PAWN => {value = 1.0}
+            PIECE_KNIGHT => {value = 3.0}
+            PIECE_BISHOP => {value = 3.0}
+            PIECE_ROOK => {value = 5.0}
+            PIECE_QUEEN => {value = 9.0}
+            PIECE_KING => {value = 1.0}
+            0 => {value = 0.0}
+            _ => {println!("INVALID PIECE AT {}, PIECE: {}", square, self.pieces[square as usize])}
+        }
+        if self.pieces[square as usize] | PIECE_COLOR_MASK == PIECE_BLACK {
+            value *= -1.0;
+        }
+        return value;
+    }
+
+    pub fn pieces(&self) -> &[u8; 64]{
+        return &self.pieces;
+    }
+
     pub fn white_to_move(&self) -> bool{self.white_to_move}
+    pub fn en_passant_square(&self) -> u8{self.en_passant_square}
+    pub fn casstle_rights(&self) -> u8{self.castle_rights}
 }
 
 impl Clone for BoardState{
     fn clone(&self) -> Self {
         Self { 
             pieces: self.pieces, 
+            pieces_backup: self.pieces,
             white_to_move: self.white_to_move, 
             en_passant_square: self.en_passant_square, 
             castle_rights: self.castle_rights, 
-            half_move_clock: self.half_move_clock }
+            half_move_clock: self.half_move_clock,
+            is_in_check: self.is_in_check,
+            legal_moves: self.legal_moves,
+            white_king: self.white_king,
+            black_king: self.black_king,
+            move_history: Vec::<ChessMove>::new(),
+            piece_history: Vec::<[u8; 64]>::new()
+        }
     }
 }
 
-impl Copy for BoardState{}
+
+

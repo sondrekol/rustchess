@@ -1,6 +1,5 @@
 
 
-use self::bit_boards::BOARD_CENTER;
 
 use super::board2::{BoardState, ChessMoveList, ChessMove, GameState};
 
@@ -14,12 +13,6 @@ pub const BISHOP:usize = 2;
 pub const ROOK:usize = 3;
 pub const QUEEN:usize = 4;
 pub const KING:usize = 5;
-
-//Castle Rights
-const WHITE_CASTLE_KING: u8 = 0b00000001;
-const WHITE_CASTLE_QUEEN: u8 = 0b00000010;
-const BLACK_CASTLE_KING: u8 = 0b00000100;
-const BLACK_CASTLE_QUEEN: u8 = 0b00001000;
 
 //Color define
 pub const WHITE: usize = 1;
@@ -296,7 +289,7 @@ impl BitBoardState{
         }
     }
 
-    fn legal_pawn_moves(&mut self, mut pawns: u64, mask:u64){
+    fn legal_pawn_moves(&mut self, pawns: u64, mask:u64){
         let rank_2nd_pawns = pawns & self.rank_2th[self.to_move];
         let rank_7th_pawns = pawns & self.rank_2th[self.other];
         self.legal_pawn_on_2nd(rank_2nd_pawns, mask);
@@ -629,10 +622,6 @@ impl BitBoardState{
         -(u64::count_ones(self.piece_bb[BLACK][ROOK]) as i32)*50
         -(u64::count_ones(self.piece_bb[BLACK][QUEEN]) as i32)*90;
     }
-    
-    pub fn update_state(&mut self){
-
-    }
 
     pub fn board_setup(&mut self, board_state:&BoardState){
         self.setup_state(board_state);
@@ -931,38 +920,6 @@ impl BitBoardState{
             piece_bb_color: colors,
             data: (self.to_move as u8) << 7 | ((self.en_passant_square%8) as u8) << 4 | castle_rights
         }
-    }
-
-
-    pub fn knights_in_center(&self, color: usize) -> i32{
-        return u64::count_ones(self.piece_bb[color][KNIGHT] & BOARD_CENTER) as i32;
-    }
-
-    //returns the map of attackers for color, color=BLACK will return blacks attackers on the square
-    fn get_attackers_for_color(&mut self, square: usize, color:usize) -> u64{
-        let mut attackers:u64 = 0;
-        if color != self.to_move{
-            attackers = self.attackers(square);
-        }else{
-            self.other = self.to_move;
-            self.to_move = color;
-            attackers = self.attackers(square);
-            self.to_move = self.other;
-            self.other = color;
-        }
-        return attackers;
-    }
-
-    //returns the absolute value of the least worth piece controlling a square
-    pub fn least_valuable_controller(&mut self, square: usize, color:usize) -> i32{
-        let attackers:u64 = self.get_attackers_for_color(square, color);
-        if attackers & self.piece_bb[color][PAWN] != 0{return 10}
-        if attackers & self.piece_bb[color][KNIGHT] != 0{return 30}
-        if attackers & self.piece_bb[color][BISHOP] != 0{return 35}
-        if attackers & self.piece_bb[color][ROOK] != 0{return 50}
-        if attackers & self.piece_bb[color][QUEEN] != 0{return 90}
-        if attackers & self.piece_bb[color][KING] != 0{return 150}
-        return 0; //return some high value 
     }
 
     //returns mask of all pieces on the board

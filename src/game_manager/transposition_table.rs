@@ -1,32 +1,37 @@
+
 use crate::game_manager::ChessMove;
 
 const TABLE_SIZE:usize = 1048576;//2^20
 const TABLE_SET_SIZE:usize = 8;
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 pub struct MoveEntry{
     chess_move: ChessMove,
     eval: i32
 }
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 struct Entry{
     key: u64, //zobrist hash of boardstate
     value: [MoveEntry; 4]
 }
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 struct TableSet{
     entries: [Entry; TABLE_SET_SIZE],
     oldest: u8
 }
 
-
+#[allow(dead_code)]
 pub struct TranspositionTable{
     sets: [TableSet; TABLE_SIZE/TABLE_SET_SIZE]
 
 }
 
+#[allow(dead_code)]
 impl TranspositionTable {
 
     pub fn new() -> Self{

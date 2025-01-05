@@ -3,18 +3,6 @@
 version = 3
 
 [[package]]
-name = "App"
-version = "0.1.0"
-dependencies = [
- "fastrand",
- "fxhash",
- "piston",
- "piston2d-graphics",
- "piston2d-opengl_graphics",
- "pistoncore-glutin_window",
-]
-
-[[package]]
 name = "ab_glyph"
 version = "0.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -59,6 +47,18 @@ name = "android-properties"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc7eb209b1518d6bb87b283c20095f5228ecda460da70b44f0802523dea6da04"
+
+[[package]]
+name = "app"
+version = "0.1.0"
+dependencies = [
+ "fastrand",
+ "fxhash",
+ "piston",
+ "piston2d-graphics",
+ "piston2d-opengl_graphics",
+ "pistoncore-glutin_window",
+]
 
 [[package]]
 name = "arrayref"

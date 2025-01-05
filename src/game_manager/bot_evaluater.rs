@@ -1,11 +1,7 @@
 #[cfg(test)]
+#[allow(dead_code)]
 mod test{
-    use std::{time::SystemTime, fs::File, io::Write};
-    use std::{
-        io::{stdout},
-        thread::sleep,
-        time::Duration,
-    };
+    use std::{fs::File, io::Write};
 
     use crate::game_manager::bot2_3::Bot2_3;
     use crate::game_manager::bot2_4::Bot2_4;
@@ -20,7 +16,6 @@ mod test{
         board_state.board_setup(&BoardState::new_from_fen(fen));
 
         let mut match_history = Vec::<BoardStateNumbers>::new();
-        let mut ply = 0;
         while board_state.game_state() == GameState::Playing {
             if board_state.white_to_move() {
                 let results = bot_white.get_move_bb(board_state, &mut match_history);
@@ -51,7 +46,6 @@ mod test{
             if match_history.len() > 300{
                 return (board_state.game_state(), game_string);
             }
-            ply += 1;
             if match_history.iter().filter(|&n| *n == board_state.board_state_numbers()).count() == 3{
                 return (GameState::Draw, game_string);
             }

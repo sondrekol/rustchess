@@ -8,7 +8,7 @@ use crate::game_manager::state_bitboard::QUEEN;
 
 use super::board2::{GameState, DOUBLE_PAWN_MOVE, W_CASTLE_KING, W_CASTLE_QUEEN, B_CASTLE_KING, B_CASTLE_QUEEN, WHITE_EN_PASSANT, BLACK_EN_PASSANT, PROMOTE_TO_KNIGHT, PROMOTE_TO_BISHOP, PROMOTE_TO_ROOK, PROMOTE_TO_QUEEN, NO_FLAG};
 use super::bot::GetMoveResult;
-use super::state_bitboard::bit_boards::{TOP_TIER_PAWN, SEC_TIER_PAWN, TOP_TIER_BISHOP, SEC_TIER_BISHOP, rank_of, pop_lsb, RookMoves, file_of, self, BOARD_CENTER, NEIGHBOUR_FILES, RANKS};
+use super::state_bitboard::bit_boards::{TOP_TIER_PAWN, SEC_TIER_PAWN, TOP_TIER_BISHOP, SEC_TIER_BISHOP, rank_of, pop_lsb, file_of, self, BOARD_CENTER, NEIGHBOUR_FILES, RANKS};
 use super::state_bitboard::{BitBoardState, BoardStateNumbers, PAWN, WHITE, BLACK, BISHOP, ROOK, KING, KNIGHT};
 
 extern crate fxhash;
@@ -128,7 +128,7 @@ impl Bot2_5 {
             }
             90 | -90 => {
                 psuedo_legal_follow_up_captures = bit_boards::RookMoves::mov_map(target, piece_mask);
-                psuedo_legal_follow_up_captures = bit_boards::BishopMoves::mov_map(target, piece_mask);
+                psuedo_legal_follow_up_captures |= bit_boards::BishopMoves::mov_map(target, piece_mask);
             }
             _ => {}
         }
@@ -140,7 +140,7 @@ impl Bot2_5 {
         }
     }
 
-    fn promising_move(&self, bit_board_state:&mut BitBoardState, chess_move: &mut ChessMove, ply: usize, best_moves_option:Option<&Vec<(ChessMove, i32)>>){
+    fn promising_move(&self, bit_board_state:&mut BitBoardState, chess_move: &mut ChessMove, _ply: usize, best_moves_option:Option<&Vec<(ChessMove, i32)>>){
 
         let mut promising_level = 0;
         
@@ -150,10 +150,7 @@ impl Bot2_5 {
         let origin_value = bit_board_state.piece_value(origin);
         let target_value = bit_board_state.piece_value(target);
         
-        let to_move = if bit_board_state.white_to_move() {1} else {0};
-        let other = if to_move == 1 {0} else {1};
         let color_value = if origin_value < 0 {-1} else {1}; //Note that origin square is never no piece
-        let other_value = if color_value == 1 {-1} else {1};
 
         /*if self.best_line[ply] == *chess_move{
             let promising_level_ref = chess_move.promising_level_mut();
@@ -297,7 +294,7 @@ impl Bot2_5 {
         return score;
     }
 
-    fn rook_score(rooks:u64, pawns:u64, blockers:u64) -> i32{
+    fn rook_score(rooks:u64, pawns:u64, _blockers:u64) -> i32{
         let mut score:i32 = 0;
         let mut rooks_mut:u64 = rooks;
         let mut attacked_by_more_rooks:u64 = u64::MAX;
@@ -367,27 +364,10 @@ impl Bot2_5 {
         return piece_count;
     }
 
-    //returns a king safety score
-    //this score is only a penalty
-    fn king_safety(pieces:&[u64; 6], other_pieces:&[u64; 6]) -> i32{
-        let mut king_safety_score = 0;
-
-        //penalty for lack of pawns infront of king
-        //penalty for the two by three area in fron of the king lacking
-
-
-        //penalty for a lot of enemy pieces near the king, this is lessened if there are also alot of own pieces nearby
-
-        //penalty for pawn storm, if enemy pawns are close. Note that this penalty should be strictly less than that for a open file near the king
-
-        
-
-        return king_safety_score;
-    }
     //0 -> all pieces are on the board
     //256 -> all pieces are on the board
     fn endgame_factor(pieces:&[[u64; 6]; 2]) -> i32{
-        let mut phase = 0;
+        let mut phase;
 
         let num_pawns = u64::count_ones(pieces[WHITE][PAWN] | pieces[BLACK][PAWN]) as i32;
         let num_knights = u64::count_ones(pieces[WHITE][KNIGHT] | pieces[BLACK][KNIGHT]) as i32;
@@ -550,7 +530,7 @@ impl Bot2_5 {
         }
     }
 
-    fn search(&mut self, mut bit_board_state:&mut BitBoardState, depth:i64, mut alpha:i32, mut beta:i32, true_depth:usize, first: bool, match_history:&mut Vec<BoardStateNumbers>) -> (i32, ChessMove){
+    fn search(&mut self, bit_board_state:&mut BitBoardState, depth:i64, mut alpha:i32, mut beta:i32, true_depth:usize, _first: bool, match_history:&mut Vec<BoardStateNumbers>) -> (i32, ChessMove){
 
 
 
@@ -614,12 +594,9 @@ impl Bot2_5 {
         for chess_move in moves{
 
             //Maybe maybe not
-            let mut extension = 0;
+            let extension = 0;
 
 
-            /*if self.is_check(bit_board_state, &chess_move) && depth == 1{
-                extension += 1;
-            }*/
 
             
 

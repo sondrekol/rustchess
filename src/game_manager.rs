@@ -4,7 +4,7 @@ use crate::game_manager::{state_bitboard::BoardStateNumbers, move_string::lan_mo
 
 use self::{board2::{BoardState, ChessMove},
 bot::{Bot, GetMoveResult}, 
-bot2::Bot2, 
+bot2::Bot2,
 state_bitboard::bit_boards::{populate_rook_moves, populate_bishop_moves}, bot2_2::Bot2_2, bot2_3::Bot2_3, bot2_4::Bot2_4, bot2_5::Bot2_5, bot2_6::Bot2_6};
 
 mod board2;

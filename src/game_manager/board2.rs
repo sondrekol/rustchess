@@ -116,7 +116,6 @@ pub struct ChessMoveList{
 
 pub struct BoardState{
     pieces: [u8; 64],
-    pieces_backup: [u8; 64],
     /*
     Indexes:
     a1 = 0
@@ -139,9 +138,7 @@ pub struct BoardState{
     is_in_check: Option<bool>,
     legal_moves: Option<ChessMoveList>,
     white_king: usize,
-    black_king: usize,
-    move_history: Vec<ChessMove>,
-    piece_history: Vec<[u8; 64]>
+    black_king: usize
 
 }
 
@@ -415,8 +412,7 @@ impl BoardState{
 
         }
         return Self { 
-            pieces: pieces, 
-            pieces_backup: pieces,
+            pieces: pieces,
             white_to_move: to_move,
             en_passant_square: en_passant_square, 
             castle_rights: castle_rights,
@@ -424,9 +420,7 @@ impl BoardState{
             is_in_check: None,
             legal_moves: None,
             white_king: white_king,
-            black_king: black_king,
-            move_history: Vec::<ChessMove>::new(),
-            piece_history: Vec::<[u8; 64]>::new()
+            black_king: black_king
         }
     }
 
@@ -435,7 +429,7 @@ impl BoardState{
         for i in 0..64{
             let graphic_rank = 7-i/8;
             let graphic_file = i%8;
-            let mut piece_type = 0;
+            let mut piece_type;
             match self.pieces[i as usize] & PIECE_TYPE_MASK{
                 PIECE_PAWN => {
                     piece_type = 1;
@@ -712,7 +706,6 @@ impl BoardState{
     }
 
     fn legal_castle_moves(&mut self, chess_moves:&mut ChessMoveList){
-        let back_rank = if self.white_to_move {0} else {56};
         if self.is_in_check(self.white_to_move) {
             return;
         }
@@ -1359,8 +1352,7 @@ impl BoardState{
 impl Clone for BoardState{
     fn clone(&self) -> Self {
         Self { 
-            pieces: self.pieces, 
-            pieces_backup: self.pieces,
+            pieces: self.pieces,
             white_to_move: self.white_to_move, 
             en_passant_square: self.en_passant_square, 
             castle_rights: self.castle_rights, 
@@ -1368,9 +1360,7 @@ impl Clone for BoardState{
             is_in_check: self.is_in_check,
             legal_moves: self.legal_moves,
             white_king: self.white_king,
-            black_king: self.black_king,
-            move_history: Vec::<ChessMove>::new(),
-            piece_history: Vec::<[u8; 64]>::new()
+            black_king: self.black_king
         }
     }
 }

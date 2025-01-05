@@ -646,6 +646,7 @@ impl Bot2_6 {
                 result.0 += 1;
             }
 
+
             if result.0 >= max{
                 
                 if !(result.0 == 0 && max > -30){//dont go for draw in a roughly equal position
@@ -702,7 +703,6 @@ impl Bot2_6 {
                 }
             }
             if alpha > beta{
-                //Killer move! opponent does not want to see this move be played
                 break;
             }
 

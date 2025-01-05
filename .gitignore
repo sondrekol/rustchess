@@ -1,3 +1,4 @@
 /target
 flamegraph.svg
 game_result.txt
+.DS_Store

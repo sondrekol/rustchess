@@ -1,0 +1,12 @@
+[package]
+name = "rustchess2"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+futures = "0.3.31"
+futures-util = "0.3.31"
+fxhash = "0.2.1"
+licheszter = "0.4.1"
+tokio = "1.48.0"
+

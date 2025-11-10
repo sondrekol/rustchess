@@ -240,9 +240,9 @@ impl Engine{
         let previous_best_moves = self.table.get(&board_state_numbers);
 
         //add promising level to the moves for later sorting
-        /*for i in 0..moves.len(){
-            self.promising_move(bit_board_state, &mut moves[i], previous_best_moves);
-        }*/
+        for i in 0..moves.len(){
+            promising_move(bit_board_state, &mut moves[i], previous_best_moves);
+        }
 
         self.table.insert(board_state_numbers, Vec::<(ChessMove, i32)>::new());
         

@@ -58,15 +58,17 @@ impl Game{
                                 break;
                             }
 
+                            //find the last move played
                             let moves = game_state.moves.split_whitespace().collect::<Vec<&str>>();
                             let last_move = *moves.last().unwrap();
                             let chess_move = board::ChessMove::from_uci(last_move, &board_state);
 
+                            //update local board
                             board_state.perform_move_mutable(chess_move);
 
+                            //copy BoardState to BitBoardState and append to history
                             let mut bb_state = BitBoardState::new();
                             bb_state.setup_state(&board_state);
-
                             game_history.push(bb_state.board_state_numbers());
 
 
@@ -75,11 +77,7 @@ impl Game{
                                 
                                 let search_result = bot.clone().get_move_bb(bb_state, &mut game_history);
                                 let uci_move = lan_move(*search_result.chess_move());
-
                                 client.bot_play_move(&self.game_id, &uci_move, false).await.unwrap();
-                            }
-                            else{
-                                //it is opponents turn, last move was bots
                             }
                         },
                         BoardState::GameFull(game_state) => {
@@ -91,6 +89,10 @@ impl Game{
 
                             if game_state.white.name == "sonkolbot" {
                                 bot_color = 0;
+
+                                let search_result = bot.clone().get_move_bb(bb_state, &mut game_history);
+                                let uci_move = lan_move(*search_result.chess_move());
+                                client.bot_play_move(&self.game_id, &uci_move, false).await.unwrap();
                             }
                         }
                         _ => {}

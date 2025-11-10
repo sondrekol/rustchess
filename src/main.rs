@@ -1,9 +1,5 @@
 mod client;
 
-use licheszter::client::Licheszter;
-use futures_util::StreamExt;
-use tokio::{runtime::Runtime, sync::futures};
-use std::thread;
 
 use crate::client::li_bot;
 

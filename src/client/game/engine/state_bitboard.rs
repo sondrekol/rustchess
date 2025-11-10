@@ -622,9 +622,6 @@ impl BitBoardState{
         -(u64::count_ones(self.piece_bb[BLACK][QUEEN]) as i32)*90;
     }
 
-    pub fn board_setup(&mut self, board_state:&BoardState){
-        self.setup_state(board_state);
-    }
 
     pub fn perform_move(&self, chess_move:ChessMove) -> BitBoardState{
         let origin: u8 = chess_move.origin();

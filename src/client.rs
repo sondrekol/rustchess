@@ -1,11 +1,9 @@
-use licheszter::client;
 use licheszter::client::Licheszter;
 use futures_util::StreamExt;
 use licheszter::models::board::Event;
 use licheszter::models::chat::ChatRoom;
 
-use std::thread;
-use std::env;
+
 use std::fs;
 
 mod game;
@@ -33,7 +31,7 @@ async fn handle_event(event: Event, client: &Licheszter) {
                 .unwrap();
 
             //client.bot_play_move(&challenge.id, "e2e4", false).await.unwrap();
-            let game = game::game::new(challenge.id.to_string());
+            let game = game::Game::new(challenge.id.to_string());
             game.game_handler().await
 
         },

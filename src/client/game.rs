@@ -1,18 +1,16 @@
-use std::{f32::consts::E, fs};
+use std::{fs};
 
 use futures::StreamExt;
-use licheszter::models::game::Game;
 use licheszter::{client::Licheszter, models::game::GameStatus};
-use licheszter::models::board::{BoardState, Event};
+use licheszter::models::board::{BoardState};
 
 mod engine;
 use engine::state_bitboard::{BitBoardState, BoardStateNumbers};
-use engine::Engine;
 use engine::board;
 
 use crate::client::game::engine::move_string::lan_move;
 
-pub struct game{
+pub struct Game{
     game_id: String
 }
 
@@ -21,7 +19,7 @@ pub struct game{
 1. local board state should be updated according to GameState received from Lichess, and not when the move is chosen locally
 
 */
-impl game{
+impl Game{
     pub fn new(game_id: String) -> Self {
         Self { game_id }
     }
@@ -41,7 +39,7 @@ impl game{
         let mut game_events = client.bot_game_connect(&self.game_id).await.unwrap();
 
         //assuming that previous line indicates that the game has started
-        let mut bot = engine::Engine::new(10, 20, 20, Some(2000));
+        let bot = engine::Engine::new(10, 20, 20, Some(2000));
         let mut board_state = board::BoardState::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         let mut game_history = Vec::<BoardStateNumbers>::new();
 

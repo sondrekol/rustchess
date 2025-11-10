@@ -90,7 +90,7 @@ impl Engine{
         }
     }
     
-   pub fn get_move_bb(&mut self, board_state:BitBoardState, match_history:&mut Vec<BoardStateNumbers>) -> GetMoveResult{
+    pub fn get_move_bb(&mut self, board_state:BitBoardState, match_history:&mut Vec<BoardStateNumbers>) -> GetMoveResult{
         self.start_time = SystemTime::now();
 
         let mut bit_board_state = board_state;
@@ -206,7 +206,10 @@ impl Engine{
 
     fn search(&mut self, bit_board_state:&mut BitBoardState, depth:i64, mut alpha:i32, mut beta:i32, true_depth:usize, _first: bool, match_history:&mut Vec<BoardStateNumbers>) -> (i32, ChessMove){
 
-        match bit_board_state.game_state(){
+
+
+        let game_state = bit_board_state.game_state();
+        match game_state{
             GameState::Black => {return (-10000, ChessMove::new_empty())}
             GameState::White => {return (10000, ChessMove::new_empty())}
             GameState::Draw => {return (0, ChessMove::new_empty())}
@@ -214,11 +217,13 @@ impl Engine{
         }
 
 
-        //TODO: move to seperate function
         let board_state_numbers = bit_board_state.board_state_numbers();
+
+        //check for draw by repetition
         if match_history.iter().filter(|&n| *n == board_state_numbers).count() == 2{
             return (0, ChessMove::new_empty()); 
         }
+
 
         match_history.push(board_state_numbers);
         
@@ -227,26 +232,24 @@ impl Engine{
             match_history.pop();
             return (self.capture_search(bit_board_state, alpha, beta, 0, None), ChessMove::new_empty());
         }
-
-
         let mut moves = bit_board_state.gen_moves_legal().moves_vec();
+
+        
+        
 
         let previous_best_moves = self.table.get(&board_state_numbers);
 
-        //precalculate promising level to the moves for later sorting
-        for i in 0..moves.len(){
-            promising_move(bit_board_state, &mut moves[i], previous_best_moves);
-        }
-
+        //add promising level to the moves for later sorting
+        /*for i in 0..moves.len(){
+            self.promising_move(bit_board_state, &mut moves[i], previous_best_moves);
+        }*/
 
         self.table.insert(board_state_numbers, Vec::<(ChessMove, i32)>::new());
         
         //at this point previous_best_moves_mut should contain an empty vec
 
-        let white_to_move = bit_board_state.white_to_move();
-        //TODO: possible to remove ifelse here?
         //Sort moves by how promising they are
-        if white_to_move {
+        if bit_board_state.white_to_move() {
             moves.sort_unstable_by(|a, b| 
                 a.promising_level()
                 .cmp(&b.promising_level())
@@ -259,27 +262,31 @@ impl Engine{
                 )
         };
         
-
-
-        let mut best:i32 = if white_to_move {i32::MIN} else {i32::MAX};
-        let mut best_move:ChessMove = *moves.get(0).unwrap();
+        let mut min:i32 = i32::MAX;
+        let mut max:i32 = i32::MIN;
+        let mut min_move:ChessMove = *moves.get(0).unwrap();
+        let mut max_move:ChessMove = *moves.get(0).unwrap();
 
         let mut move_placement = 0;
         let mut best_move_placement: f64 = 0.0;
 
-        
+        let move_count = moves.len() as f64;
         for chess_move in moves{
 
             //Maybe maybe not
             let extension = 0;
+
 
             /*if self.is_check(bit_board_state, &chess_move) && depth == 1{
                 extension += 1;
             }*/
 
             
-            let mut result = self.search(&mut bit_board_state.perform_move(chess_move), depth-1+extension, alpha, beta, true_depth +1, false, match_history);
 
+            
+            let mut result = self.search(&mut bit_board_state.perform_move(chess_move), depth-1+extension, alpha, beta, true_depth +1, false, match_history);
+            
+            
             if let Some(max_time) = self.max_time{
                 if self.start_time.elapsed().unwrap().as_millis() > max_time{
                     self.search_stopped = true;
@@ -287,57 +294,85 @@ impl Engine{
                 }
             }
 
-
             if result.0 >= 1000 {
                 result.0 -= 1;
             }else if result.0 <= -1000{
                 result.0 += 1;
             }
-            
-            if (white_to_move && result.0 > best) || (!white_to_move && result.0 < best){//new best move found
-                best = result.0;
-                best_move = result.1;
 
-                best_move_placement = move_placement as f64;
 
-                let best_moves = self.table.get_mut(&board_state_numbers).unwrap();
-                let mut found_move: bool = false;
-                for i in 0..best_moves.len(){
-                    if best_move == best_moves[i].0{
-                        best_moves[i].1 = best;
-                        found_move = true;
-                        break;
+            if result.0 >= max{
+                
+                if !(result.0 == 0 && max > -30){//dont go for draw in a roughly equal position
+                    max = result.0;
+                    max_move = chess_move;
+                    best_move_placement = move_placement as f64/move_count;
+                    
+                    //replace or add best move
+                    let best_moves = self.table.get_mut(&board_state_numbers).unwrap();
+                    let mut found_move: bool = false;
+                    for i in 0..best_moves.len(){
+                        if max_move == best_moves[i].0{
+                            best_moves[i].1 = max;
+                            found_move = true;
+                            break;
+                        }
+                    }
+                    if !found_move{
+                        self.table.get_mut(&board_state_numbers).unwrap().push((max_move, max));
                     }
                 }
-                if !found_move{
-                    self.table.get_mut(&board_state_numbers).unwrap().push((best_move, best));
+                
+            }
+            if result.0 <= min{
+                if !(result.0 == 0 && min < 30){//dont go for draw in a roughly equal position
+                    min = result.0;
+                    min_move = chess_move;
+                    best_move_placement = move_placement as f64/move_count;
+
+                    //replace or add best move
+                    let best_moves = self.table.get_mut(&board_state_numbers).unwrap();
+                    let mut found_move: bool = false;
+                    for i in 0..best_moves.len(){
+                        if min_move == best_moves[i].0{
+                            best_moves[i].1 = min;
+                            found_move = true;
+                            break;
+                        }
+                    }
+                    if !found_move{
+                        self.table.get_mut(&board_state_numbers).unwrap().push((min_move, min));
+                    }
                 }
+
             }
 
-            if white_to_move {
-                if best > alpha {
-                    alpha = best;
+            if bit_board_state.white_to_move() {
+                if max > alpha {
+                    alpha = max;
                 }
             }else {
-                if best < beta{
-                    beta = best;
+                if min < beta{
+                    beta = min;
                 }
             }
-
             if alpha > beta{
                 break;
             }
 
             move_placement += 1;
         }
-
         self.average_best_move_index_placement += 1;
         self.average_best_move_placement += (best_move_placement as f64 - self.average_best_move_placement)/self.average_best_move_index_placement as f64;
 
 
 
         match_history.pop();
-        return (best, best_move);
+        if bit_board_state.white_to_move(){
+            return (max, max_move);
+        }else{
+            return (min, min_move);
+        }
     }
 }
 

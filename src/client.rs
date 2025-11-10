@@ -4,7 +4,8 @@ use licheszter::models::board::Event;
 use licheszter::models::chat::ChatRoom;
 
 
-use std::fs;
+use dotenvy::dotenv;
+use std::env;
 
 mod game;
 
@@ -16,6 +17,8 @@ async fn handle_event(event: Event, client: &Licheszter) {
             // Handle game start event
             println!("Game started with session ID: {}", game.id);
             println!("against players: {:?}", game.opponent.username);
+            let game = game::Game::new(game.id);
+            game.game_handler().await
         },
         Event::Challenge { challenge } => {
             // Handle challenge event
@@ -31,8 +34,6 @@ async fn handle_event(event: Event, client: &Licheszter) {
                 .unwrap();
 
             //client.bot_play_move(&challenge.id, "e2e4", false).await.unwrap();
-            let game = game::Game::new(challenge.id.to_string());
-            game.game_handler().await
 
         },
         _ => {}
@@ -40,24 +41,18 @@ async fn handle_event(event: Event, client: &Licheszter) {
 }
 
 pub async fn li_bot() {
-    // Create a new instance of Licheszter with your account token
 
-    let key = fs::read_to_string("lichess_api_key.txt")
-        .expect("Failed to read API key from file")
-        .trim()
-        .to_string();
+
+    match dotenvy::dotenv().ok() {
+        Some(path) => println!("Loaded .env file {}", path.display()),
+        None => println!(".env file not found, proceeding without it"),
+    }
+    let key = env::var("LICHESS_API_KEY").unwrap();
 
     let client = Licheszter::builder()
         .with_authentication(key)
         .build();
 
-    println!("{}", client.account_email().await.unwrap().email);
-
-    // Use the client to fetch online bots, for example...
-
-    // ...or open the event stream
-
-    // *Should not be mutable
     let mut events = client.connect().await.unwrap();
     
     while let Some(result) = events.next().await {

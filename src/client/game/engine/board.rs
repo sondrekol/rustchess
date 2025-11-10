@@ -153,23 +153,34 @@ impl ChessMove{
 
     pub fn from_uci(uci_move:&str, board_state:&BoardState) -> Self{
         match uci_move {
-            "e1g1" => {return Self::from_indices(W_CASTLE_KING, 0, 0)},
-            "e1c1" => {return Self::from_indices(W_CASTLE_QUEEN, 0, 0)},
-            "e8g8" => {return Self::from_indices(B_CASTLE_KING, 0, 0)},
-            "e8c8" => {return Self::from_indices(B_CASTLE_QUEEN, 0, 0)},
+            "e1g1" => {
+                if board_state.castle_rights & WHITE_CASTLE_KING != 0{
+                    return Self::from_indices(W_CASTLE_KING, 0, 0);
+                }},
+            "e1c1" => {
+                if board_state.castle_rights & WHITE_CASTLE_QUEEN != 0{
+                    return Self::from_indices(W_CASTLE_QUEEN, 0, 0);
+                }},
+            "e8g8" => {
+                if board_state.castle_rights & BLACK_CASTLE_KING != 0{
+                    return Self::from_indices(B_CASTLE_KING, 0, 0);
+                }},
+            "e8c8" => {
+                if board_state.castle_rights & BLACK_CASTLE_QUEEN != 0{
+                    return Self::from_indices(B_CASTLE_QUEEN, 0, 0);
+                }},
             _ => {
                 
             }
         }
-        //TODO: find squares
         let origin_file = (uci_move.chars().nth(0).unwrap() as u8) - ('a' as u8);
         let origin_rank = (uci_move.chars().nth(1).unwrap() as u8) - ('1' as u8);
         let target_file = (uci_move.chars().nth(2).unwrap() as u8) - ('a' as u8);
         let target_rank = (uci_move.chars().nth(3).unwrap() as u8) - ('1' as u8);
+        let origin = origin_rank * 8 + origin_file;
+        let target = target_rank * 8 + target_file;
 
-        let origin = origin_rank * 8 + origin_file;//TODO: doublecheck if right
-        let target = target_rank * 8 + target_file;//TODO: doublecheck if right
-        //TODO: check for promotion
+
         if uci_move.len() == 5{
             let promote_char = uci_move.chars().nth(4).unwrap();
             let promote_flag = match promote_char {
@@ -181,8 +192,7 @@ impl ChessMove{
             };
             return Self::from_indices(promote_flag, origin, target);
         }
-        //TODO: check if moving piece is a pawn and then:
-            //TODO: check if double pawn or if en passant, easily done by checking how the pawn moves
+
         if board_state.piece(origin as usize) == PIECE_PAWN {
             if BoardState::vertical_distance(origin, target) == 2 {
                 return Self::from_indices(DOUBLE_PAWN_MOVE, origin, target);
@@ -197,7 +207,7 @@ impl ChessMove{
             }
         }
         return Self::from_indices(NO_FLAG, origin, target);
-        
+
     }
     pub fn new_empty() -> Self{
         Self { 

@@ -1,4 +1,7 @@
-use std::{fs};
+use dotenvy::dotenv;
+use licheszter::models::chat::ChatRoom;
+use std::env;
+use std::time::Duration;
 
 use futures::StreamExt;
 use licheszter::{client::Licheszter, models::game::GameStatus};
@@ -27,10 +30,8 @@ impl Game{
     pub async fn game_handler(&self) {
         // Example: Fetch and print the current state of the game
         
-        let key = fs::read_to_string("lichess_api_key.txt")
-        .expect("Failed to read API key from file")
-        .trim()
-        .to_string();
+        dotenvy::dotenv().ok();
+        let key = env::var("LICHESS_API_KEY").unwrap();
 
         let client = Licheszter::builder()
             .with_authentication(key)
@@ -39,7 +40,7 @@ impl Game{
         let mut game_events = client.bot_game_connect(&self.game_id).await.unwrap();
 
         //assuming that previous line indicates that the game has started
-        let bot = engine::Engine::new(10, 20, 20, Some(2000));
+        let bot = engine::Engine::new(10, 20, 1000000, Some(30000));
         let mut board_state = board::BoardState::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         let mut game_history = Vec::<BoardStateNumbers>::new();
 
@@ -77,7 +78,22 @@ impl Game{
                                 
                                 let search_result = bot.clone().get_move_bb(bb_state, &mut game_history);
                                 let uci_move = lan_move(*search_result.chess_move());
-                                client.bot_play_move(&self.game_id, &uci_move, false).await.unwrap();
+                                
+                                for attempt in 0..3 {
+                                    match client.bot_play_move(&self.game_id, &uci_move, false).await {
+                                        Ok(_) => {
+                                            break;
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Failed to send move (attempt {}): {}", attempt + 1, e);
+                                            if attempt == 2 {
+                                                eprintln!("Giving up sending move {}", uci_move);
+                                            } else {
+                                                tokio::time::sleep(Duration::from_millis(500 * (attempt + 1))).await;
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         },
                         BoardState::GameFull(game_state) => {
@@ -95,9 +111,16 @@ impl Game{
                                 client.bot_play_move(&self.game_id, &uci_move, false).await.unwrap();
                             }
                         }
+                        BoardState::ChatLine(chat)=>{
+                            if chat.username == "sonkolbot" {
+                                continue;
+                            }
+                            client.bot_chat_write(&self.game_id, ChatRoom::Player, &chat.text).await.unwrap();
+                        }
                         _ => {}
                     }
                 }
+                
                 Err(e)=>{
                     println!("Error in game stream: {}", e);
                 }

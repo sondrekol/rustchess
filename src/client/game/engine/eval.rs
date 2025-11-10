@@ -343,43 +343,43 @@ pub fn promising_move(bit_board_state:&mut BitBoardState, chess_move: &mut Chess
 
 pub fn evaluate(bit_board_state:&BitBoardState) -> i32{
     let pieces = bit_board_state.piece_bb();
-        let piece_mask:u64 = bit_board_state.piece_mask();
+    let piece_mask:u64 = bit_board_state.piece_mask();
 
 
-        let endgame_factor = endgame_factor(&pieces);
+    let endgame_factor = endgame_factor(&pieces);
 
-        let mut eval:i32 = 0;
-        //eval += fastrand::i32(-5..5);
+    let mut eval:i32 = 0;
+    //eval += fastrand::i32(-5..5);
 
-        eval += dynamic_piece_count(&pieces[WHITE], &pieces[BLACK]) -
-                dynamic_piece_count(&pieces[BLACK], &pieces[WHITE]);
+    eval += dynamic_piece_count(&pieces[WHITE], &pieces[BLACK]) -
+            dynamic_piece_count(&pieces[BLACK], &pieces[WHITE]);
 
-        eval += (pawn_placement_score(pieces[WHITE][PAWN], WHITE) - 
-                pawn_placement_score(pieces[BLACK][PAWN], BLACK))
-                *3;
-        
-        eval += ((pawn_promotion_score(pieces[WHITE][PAWN], WHITE) - 
-                pawn_promotion_score(pieces[BLACK][PAWN], BLACK))
-                *endgame_factor)/10;
+    eval += (pawn_placement_score(pieces[WHITE][PAWN], WHITE) - 
+            pawn_placement_score(pieces[BLACK][PAWN], BLACK))
+            *3;
+    
+    eval += ((pawn_promotion_score(pieces[WHITE][PAWN], WHITE) - 
+            pawn_promotion_score(pieces[BLACK][PAWN], BLACK))
+            *endgame_factor)/10;
 
-        eval += (pawn_structure_score(pieces[WHITE][PAWN]) -
-                pawn_structure_score(pieces[BLACK][PAWN]))
-                *35;
+    eval += (pawn_structure_score(pieces[WHITE][PAWN]) -
+            pawn_structure_score(pieces[BLACK][PAWN]))
+            *35;
 
-        eval += (knight_placement_score(pieces[WHITE][KNIGHT]) -
-                knight_placement_score(pieces[BLACK][KNIGHT]))
-                *5;
+    eval += (knight_placement_score(pieces[WHITE][KNIGHT]) -
+            knight_placement_score(pieces[BLACK][KNIGHT]))
+            *5;
 
-        eval += (bishop_placement_score(pieces[WHITE][BISHOP], WHITE) -
-                bishop_placement_score(pieces[BLACK][BISHOP], BLACK))
-                *15;
+    eval += (bishop_placement_score(pieces[WHITE][BISHOP], WHITE) -
+            bishop_placement_score(pieces[BLACK][BISHOP], BLACK))
+            *15;
 
-        eval += (rook_score(pieces[WHITE][ROOK], pieces[WHITE][PAWN], piece_mask) -
-                rook_score(pieces[BLACK][ROOK], pieces[BLACK][PAWN], piece_mask)
-                )*20;
-        eval += (king_safety(&pieces[WHITE], &pieces[BLACK], WHITE) -
-                king_safety(&pieces[BLACK], &pieces[WHITE], BLACK))
-                *35;
+    eval += (rook_score(pieces[WHITE][ROOK], pieces[WHITE][PAWN], piece_mask) -
+            rook_score(pieces[BLACK][ROOK], pieces[BLACK][PAWN], piece_mask)
+            )*20;
+    eval += (king_safety(&pieces[WHITE], &pieces[BLACK], WHITE) -
+            king_safety(&pieces[BLACK], &pieces[WHITE], BLACK))
+            *35;
 
-        return eval;
+    return eval;
 }

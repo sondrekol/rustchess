@@ -94,8 +94,12 @@ impl Game{
                 Ok(event)=>{
                     match event {
                         BoardState::GameState ( game_state ) => {
-                            if game_state.status != GameStatus::Started {
-                                break;
+                            match game_state.status {
+                                GameStatus::Mate | GameStatus::Resign | GameStatus::Timeout | GameStatus::Draw=> {
+                                    println!("Game ended with status: {:?}", game_state.status);
+                                    return;
+                                },
+                                _ => {}
                             }
 
                             //find the last move played
@@ -128,7 +132,7 @@ impl Game{
                                 bot_color = 0;
                                 self.play_move(&client, &bot, &bb_state, &mut game_history).await;
                             }
-                        }
+                        },
                         BoardState::ChatLine(chat)=>{
                             if chat.username == BOT_NAME {
                                 continue;

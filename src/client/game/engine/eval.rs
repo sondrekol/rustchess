@@ -1,3 +1,4 @@
+use crate::client::game::engine::board;
 /**
  * eval contains all functions meant to statically evaluate a function, mainly trough the function "evaluate"
  * all static evaluation should remain stateless
@@ -245,9 +246,10 @@ pub fn is_capture(bit_board_state:&mut BitBoardState, m: &ChessMove) -> bool{
     }
 }
 
-//attempts to evaluate how good a move is, without calculating 
+//attempts a very rough estimate on how good a move is
 pub fn promising_move(bit_board_state:&mut BitBoardState, chess_move: &mut ChessMove, best_moves_option:Option<&Vec<(ChessMove, i32)>>){
-
+    
+    
     let mut promising_level = 0;
     
     let origin = chess_move.origin() as usize;
@@ -256,10 +258,7 @@ pub fn promising_move(bit_board_state:&mut BitBoardState, chess_move: &mut Chess
     let origin_value = bit_board_state.piece_value(origin);
     let target_value = bit_board_state.piece_value(target);
     
-    //let to_move = if bit_board_state.white_to_move() {1} else {0}; //?commented because of warning
-    //let other = if to_move == 1 {0} else {1}; //?commented because of warning
-    let color_value = if origin_value < 0 {-1} else {1}; //Note that origin square is never no piece
-    //let other_value = if color_value == 1 {-1} else {1}; //?commented because of warning
+    let color_value = if origin_value < 0 {-1} else {1};
 
 
     if let Some(best_moves) = best_moves_option{
@@ -272,8 +271,12 @@ pub fn promising_move(bit_board_state:&mut BitBoardState, chess_move: &mut Chess
         }
     }
 
+    
+
+
+    //?I dont understand the unsused variable warnings here, TODO: fix later
     match chess_move.flag(){
-        NO_FLAG => {
+        board::NO_FLAG => {
             if target_value != 0{ //is a capture
                 /*
                 capture of a rook will always come before capture of a knight,
@@ -302,31 +305,31 @@ pub fn promising_move(bit_board_state:&mut BitBoardState, chess_move: &mut Chess
             }
 
         }
-        DOUBLE_PAWN_MOVE => {
+        board::DOUBLE_PAWN_MOVE => {
             promising_level += 10*color_value;
         }
-        W_CASTLE_KING | W_CASTLE_QUEEN => {
+        board::W_CASTLE_KING | board::W_CASTLE_QUEEN => {
             promising_level += 10;
         }
-        B_CASTLE_KING | B_CASTLE_QUEEN => {
+        board::B_CASTLE_KING | board::B_CASTLE_QUEEN => {
             promising_level += -10;
         }
-        WHITE_EN_PASSANT => {
+        board::WHITE_EN_PASSANT => {
             promising_level += 20;
         }
-        BLACK_EN_PASSANT => {
+        board::BLACK_EN_PASSANT => {
             promising_level += -20;
         }
-        PROMOTE_TO_KNIGHT => {
+        board::PROMOTE_TO_KNIGHT => {
             promising_level += 10*color_value - target_value;
         }
-        PROMOTE_TO_BISHOP => {
+        board::PROMOTE_TO_BISHOP => {
             promising_level += 2*color_value - target_value;
         }
-        PROMOTE_TO_ROOK => {
+        board::PROMOTE_TO_ROOK => {
             promising_level += 2*color_value - target_value;
         }
-        PROMOTE_TO_QUEEN => {
+        board::PROMOTE_TO_QUEEN => {
             promising_level += 90*color_value - target_value;
         }
         _ => {println!("INVALID MOVE FLAG")}

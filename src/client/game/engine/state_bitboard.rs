@@ -608,19 +608,6 @@ impl BitBoardState{
         return self.legal_moves;
     }
     
-    pub fn piece_count(&self) -> i32{
-        return 
-         (u64::count_ones(self.piece_bb[WHITE][PAWN]) as i32)*10
-        +(u64::count_ones(self.piece_bb[WHITE][KNIGHT]) as i32)*30
-        +(u64::count_ones(self.piece_bb[WHITE][BISHOP]) as i32)*35
-        +(u64::count_ones(self.piece_bb[WHITE][ROOK]) as i32)*50
-        +(u64::count_ones(self.piece_bb[WHITE][QUEEN]) as i32)*90
-        -(u64::count_ones(self.piece_bb[BLACK][PAWN]) as i32)*10
-        -(u64::count_ones(self.piece_bb[BLACK][KNIGHT]) as i32)*30
-        -(u64::count_ones(self.piece_bb[BLACK][BISHOP]) as i32)*35
-        -(u64::count_ones(self.piece_bb[BLACK][ROOK]) as i32)*50
-        -(u64::count_ones(self.piece_bb[BLACK][QUEEN]) as i32)*90;
-    }
 
 
     pub fn perform_move(&self, chess_move:ChessMove) -> BitBoardState{

@@ -113,8 +113,9 @@ impl RookMoves{
         return map;
     }
 
-    pub fn mov_map(pos:usize, blockers:u64) -> u64{// !temp until magics
-        //return Self::generate_rook_moves(pos, blockers);
+    pub fn mov_map(pos:usize, blockers:u64) -> u64{
+
+        //unsafe because of mutable static access
         unsafe{
             return ROOK_MOVES[magic_index(blockers, &magics::ROOK_MAGICS[pos])];
         }
@@ -154,8 +155,9 @@ impl BishopMoves{
         }
         return map;
     }
-    pub fn mov_map(pos:usize, blockers:u64) -> u64{// !TEMP UNTIL MAGICS
-        //return Self::generate_bishop_moves(pos, blockers);
+    pub fn mov_map(pos:usize, blockers:u64) -> u64{
+
+        //unsafe because of mutable static access
         unsafe{
             return BISHOP_MOVES[magic_index(blockers, &magics::BISHOP_MAGICS[pos])];
         }
@@ -345,6 +347,7 @@ pub fn populate_rook_moves(){
             blockers = (blockers - 1) & entry.mask;
             let index = magic_index(blockers, entry);
 
+            //unsafe block to write to static array
             unsafe{
                 ROOK_MOVES[index] = RookMoves::generate_rook_moves(i, blockers);
             }
@@ -353,8 +356,6 @@ pub fn populate_rook_moves(){
                 break;
             }
         }
-
-        //TODO loop trough all subsets of mask
     }
 }
 
@@ -371,6 +372,7 @@ pub fn populate_bishop_moves(){
             blockers = (blockers - 1) & entry.mask;
             let index = magic_index(blockers, entry);
 
+            //unsafe block to write to static array
             unsafe{
                 BISHOP_MOVES[index] = BishopMoves::generate_bishop_moves(i, blockers);
             }

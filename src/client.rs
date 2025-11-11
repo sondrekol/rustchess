@@ -4,7 +4,7 @@ use licheszter::models::board::Event;
 use licheszter::models::chat::ChatRoom;
 
 
-use dotenvy::dotenv;
+
 use std::env;
 
 mod game;

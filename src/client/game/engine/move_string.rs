@@ -1,8 +1,5 @@
 use super::board::{ChessMove, W_CASTLE_KING, W_CASTLE_QUEEN, B_CASTLE_KING, B_CASTLE_QUEEN, PROMOTE_TO_BISHOP, PROMOTE_TO_KNIGHT, PROMOTE_TO_ROOK};
 
-pub fn move_string_short(chess_move:&ChessMove) -> String{
-    return format!("{}{} f({})", string_square(chess_move.origin()), string_square(chess_move.target()), chess_move.flag()); 
-}
 
 pub fn lan_move(chess_move:ChessMove) -> String{
     match chess_move.flag() {

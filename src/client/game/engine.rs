@@ -249,18 +249,13 @@ impl Engine{
         //at this point previous_best_moves_mut should contain an empty vec
 
         //Sort moves by how promising they are
+        moves.sort_unstable_by(|a, b| 
+                a.promising_level()
+                .cmp(&b.promising_level())
+            );
         if bit_board_state.white_to_move() {
-            moves.sort_unstable_by(|a, b| 
-                a.promising_level()
-                .cmp(&b.promising_level())
-                .reverse()
-                )
-        }else {
-            moves.sort_unstable_by(|a, b| 
-                a.promising_level()
-                .cmp(&b.promising_level())
-                )
-        };
+            moves.reverse();
+        }
         
         let mut min:i32 = i32::MAX;
         let mut max:i32 = i32::MIN;

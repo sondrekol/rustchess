@@ -25,10 +25,10 @@ const PIECE_TYPE_MASK: u8 = 0b00000111;
 const PIECE_COLOR_MASK: u8 = 0b11000000;
 
 //Castle Rights
-const WHITE_CASTLE_KING: u8 = 0b00000001;
-const WHITE_CASTLE_QUEEN: u8 = 0b00000010;
-const BLACK_CASTLE_KING: u8 = 0b00000100;
-const BLACK_CASTLE_QUEEN: u8 = 0b00001000;
+const WHITE_CAN_CASTLE_KING: u8 = 0b00000001;
+const WHITE_CAN_CASTLE_QUEEN: u8 = 0b00000010;
+const BLACK_CAN_CASTLE_KING: u8 = 0b00000100;
+const BLACK_CAN_CASTLE_QUEEN: u8 = 0b00001000;
 
 //To move define
 const WHITE_TO_MOVE: bool = true;
@@ -57,6 +57,7 @@ pub const BLACK_EN_PASSANT:u8 = 0b1001;
 pub const DOUBLE_PAWN_MOVE:u8 = 0b1010;
 
 pub const NO_FLAG:u8 = 0b1111;
+
 
 
 pub static VERTICAL_DISTANCE:[[u8; 64];64] = {
@@ -154,19 +155,19 @@ impl ChessMove{
     pub fn from_uci(uci_move:&str, board_state:&BoardState) -> Self{
         match uci_move {
             "e1g1" => {
-                if board_state.castle_rights & WHITE_CASTLE_KING != 0{
+                if board_state.castle_rights & WHITE_CAN_CASTLE_KING != 0{
                     return Self::from_indices(W_CASTLE_KING, 0, 0);
                 }},
             "e1c1" => {
-                if board_state.castle_rights & WHITE_CASTLE_QUEEN != 0{
+                if board_state.castle_rights & WHITE_CAN_CASTLE_QUEEN != 0{
                     return Self::from_indices(W_CASTLE_QUEEN, 0, 0);
                 }},
             "e8g8" => {
-                if board_state.castle_rights & BLACK_CASTLE_KING != 0{
+                if board_state.castle_rights & BLACK_CAN_CASTLE_KING != 0{
                     return Self::from_indices(B_CASTLE_KING, 0, 0);
                 }},
             "e8c8" => {
-                if board_state.castle_rights & BLACK_CASTLE_QUEEN != 0{
+                if board_state.castle_rights & BLACK_CAN_CASTLE_QUEEN != 0{
                     return Self::from_indices(B_CASTLE_QUEEN, 0, 0);
                 }},
             _ => {
@@ -426,10 +427,10 @@ impl BoardState{
             //castling rights
             else if state == 2{
                 match c{
-                    'q' => {castle_rights |= BLACK_CASTLE_QUEEN}
-                    'k' => {castle_rights |= BLACK_CASTLE_KING}
-                    'Q' => {castle_rights |= WHITE_CASTLE_QUEEN}
-                    'K' => {castle_rights |= WHITE_CASTLE_KING}
+                    'q' => {castle_rights |= BLACK_CAN_CASTLE_QUEEN}
+                    'k' => {castle_rights |= BLACK_CAN_CASTLE_KING}
+                    'Q' => {castle_rights |= WHITE_CAN_CASTLE_QUEEN}
+                    'K' => {castle_rights |= WHITE_CAN_CASTLE_KING}
                     ' ' => {state+=1; continue}
                     _ => {continue}
                 }
@@ -769,26 +770,26 @@ impl BoardState{
             return;
         }
         if self.white_to_move {
-            if self.castle_rights & WHITE_CASTLE_KING != 0 && self.can_castle(4, 7){
+            if self.castle_rights & WHITE_CAN_CASTLE_KING != 0 && self.can_castle(4, 7){
                 chess_moves.add(ChessMove::from_indices(
                     W_CASTLE_KING, 
                     0, 
                     0))
             }
-            if self.castle_rights & WHITE_CASTLE_QUEEN != 0 && self.can_castle(4, 0){
+            if self.castle_rights & WHITE_CAN_CASTLE_QUEEN != 0 && self.can_castle(4, 0){
                 chess_moves.add(ChessMove::from_indices(
                     W_CASTLE_QUEEN, 
                     0, 
                     0))
             }
         }else{
-            if self.castle_rights & BLACK_CASTLE_KING != 0 && self.can_castle(60, 63){
+            if self.castle_rights & BLACK_CAN_CASTLE_KING != 0 && self.can_castle(60, 63){
                 chess_moves.add(ChessMove::from_indices(
                     B_CASTLE_KING, 
                     0, 
                     0))
             }
-            if self.castle_rights & BLACK_CASTLE_QUEEN != 0 && self.can_castle(60, 56){
+            if self.castle_rights & BLACK_CAN_CASTLE_QUEEN != 0 && self.can_castle(60, 56){
                 chess_moves.add(ChessMove::from_indices(
                     B_CASTLE_QUEEN, 
                     0, 

@@ -1,4 +1,4 @@
-use dotenvy::dotenv;
+
 use licheszter::models::chat::ChatRoom;
 use std::env;
 use std::time::Duration;

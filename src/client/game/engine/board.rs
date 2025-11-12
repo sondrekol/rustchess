@@ -119,7 +119,10 @@ impl ChessMove{
     Next 6 bits are the index of the target square
     last 6 bits are the index of the origin square
      */
-
+    pub fn move_data(&self) -> u16{
+        return self.move_data;
+    }
+    
     pub fn from_uci(uci_move:&str, board_state:&BoardState) -> Self{
         match uci_move {
             "e1g1" => {
@@ -142,6 +145,7 @@ impl ChessMove{
                 
             }
         }
+
         let origin_file = (uci_move.chars().nth(0).unwrap() as u8) - ('a' as u8);
         let origin_rank = (uci_move.chars().nth(1).unwrap() as u8) - ('1' as u8);
         let target_file = (uci_move.chars().nth(2).unwrap() as u8) - ('a' as u8);

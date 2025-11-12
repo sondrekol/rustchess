@@ -1,16 +1,47 @@
-use licheszter::client::Licheszter;
+use licheszter::{client::Licheszter, config::challenges::ChallengeOptions};
 use futures_util::StreamExt;
 use licheszter::models::board::Event;
 
 
 
 use std::env;
+use rand::Rng;
 
 mod game;
 
 
+async fn attempt_challenge(client:& Licheszter) {
+    let options = ChallengeOptions::new()
+        .rated(true)
+        .clock(60, 0);
 
-async fn handle_event(event: Event, client: &Licheszter) {
+
+    loop{
+        let mut bot_stream = client.bots_online(5).await.unwrap();
+        while let Some(Ok(bot)) = bot_stream.next().await{
+    
+            println!("Found online bot: {} ({})", &bot.username, &bot.id);
+            let bot_i = rand::random_range(0..5);
+            if bot_i != 0 {continue;} 
+            
+            
+            match client.challenge_create(&bot.username, Some(&options)).await {
+                Ok(challenge) => {
+                    println!("Challenge sent to {} with ID: {}", &bot.username, challenge.id);
+                }
+                Err(e) => {
+                    eprintln!("Failed to send challenge: {}", e);
+                }
+            }
+            return;
+        }
+    }
+    
+
+    
+}
+
+async fn handle_event(event: Event, client: &Licheszter) -> u8{
     match event {
         Event::GameStart { game } => {
 
@@ -21,20 +52,28 @@ async fn handle_event(event: Event, client: &Licheszter) {
             let game = game::Game::new(game.id);
 
             //TODO: handle in seperate thread
-            game.game_handler().await
-
+            game.game_handler().await;
+            return 1;
         },
         Event::Challenge { challenge } => {
+            if challenge.challenger.id == "sonkolbot" {
+                //challenge from self, ignore
+                return 1;
+            }
             println!("Received challenge from: {}", challenge.challenger.id);
-            if challenge.challenger.id != "sondrekol" {
+            /*if challenge.challenger.id != "sondrekol" {
                 client.challenge_decline(&challenge.id, None).await.unwrap();
                 return;
-            }
+            }*/
             
             client.challenge_accept(&challenge.id).await.unwrap();
-
+            return 1;
         },
-        _ => {}
+        Event::GameFinish { game } => {
+            println!("Game finished with ID: {}", game.id);
+            return 0;
+        },
+        _ => {return 1;}
     }
 }
 
@@ -52,13 +91,20 @@ pub async fn li_bot() {
         .build();
 
     let mut events = client.connect().await.unwrap();
+
+    loop{
+        attempt_challenge(&client).await;
     
-    while let Some(result) = events.next().await {
-        match result {
-            Ok(event) => {
-                handle_event(event, &client).await;
-            },
-            Err(e) => eprintln!("Error receiving event: {:?}", e),
+        while let Some(result) = events.next().await {
+            match result {
+                Ok(event) => {
+                    if handle_event(event, &client).await == 0 {
+                        break;
+                    }
+                },
+                Err(e) => eprintln!("Error receiving event: {:?}", e),
+            }
         }
+
     }
 }

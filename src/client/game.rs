@@ -22,7 +22,7 @@ const BOT_NAME:&str = "sonkolbot";
 const TABLE_SIZE:usize = 1000000;
 const SEARCH_DEPTH:i64 = 10;
 const MAX_DEPTH:usize = 20;
-const MAX_TIME:Option<u128> = Some(3000);
+const MAX_TIME:Option<u128> = Some(500);
 const STARTING_POS:&str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 /*
 game handler for a specific game
@@ -119,6 +119,9 @@ impl Game{
                             if moves.len() % 2 == bot_color {
                                 //it is bots turn, last move was opponents
                                 self.play_move(&client, &bot, &bb_state, &mut game_history).await;
+                            }
+                            else{
+                                println!("Opponent played move: {}, interpreted as {}, raw = {:x}", last_move, lan_move(chess_move), chess_move.move_data());
                             }
                         },
                         BoardState::GameFull(game_state) => {

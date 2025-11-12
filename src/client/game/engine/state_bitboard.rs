@@ -166,8 +166,6 @@ impl BitBoardState{
         self.castle_b_k = if castle_rights & 0b0100 != 0 {true} else {false};
         self.castle_b_q = if castle_rights & 0b1000 != 0 {true} else {false};
 
-        //TODO: move clock
-
         self.checkers = 0;
         self.check_line = 0;
         self.pinned_pieces = 0;

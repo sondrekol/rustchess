@@ -7,7 +7,7 @@ use futures::StreamExt;
 use licheszter::{client::Licheszter, models::game::GameStatus};
 use licheszter::models::board::{BoardState};
 
-mod engine;
+pub(crate) mod engine;
 use engine::state_bitboard::{BitBoardState, BoardStateNumbers};
 use engine::board;
 
@@ -22,7 +22,7 @@ const BOT_NAME:&str = "sonkolbot";
 const TABLE_SIZE:usize = 1000000;
 const SEARCH_DEPTH:i64 = 10;
 const MAX_DEPTH:usize = 20;
-const MAX_TIME:Option<u128> = Some(500);
+const MAX_TIME:Option<u128> = Some(2000);
 const STARTING_POS:&str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 /*
 game handler for a specific game
@@ -86,9 +86,6 @@ impl Game{
 
         let mut bot_color = 1;
 
-        engine::state_bitboard::bit_boards::populate_rook_moves();
-        engine::state_bitboard::bit_boards::populate_bishop_moves();
-
         while let Some(result) = game_events.next().await {
             match result {
                 Ok(event)=>{
@@ -133,6 +130,23 @@ impl Game{
 
                             if game_state.white.name == BOT_NAME {
                                 bot_color = 0;
+                                self.play_move(&client, &bot, &bb_state, &mut game_history).await;
+                            }
+                            else if !game_state.state.moves.is_empty(){
+
+                                // !DUPLICATE CODE DISGUSTING
+                                //find the last move played
+                                let moves = game_state.state.moves.split_whitespace().collect::<Vec<&str>>();
+                                let last_move = *moves.last().unwrap();
+                                let chess_move = board::ChessMove::from_uci(last_move, &board_state);
+
+                                //update local board
+                                board_state.perform_move(chess_move);
+
+                                //copy BoardState to BitBoardState and append to history
+                                let mut bb_state = BitBoardState::new();
+                                bb_state.setup_state(&board_state);
+                                game_history.push(bb_state.board_state_numbers());
                                 self.play_move(&client, &bot, &bb_state, &mut game_history).await;
                             }
                         },

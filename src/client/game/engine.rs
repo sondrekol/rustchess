@@ -17,6 +17,10 @@ use fxhash::FxHasher;
 use board::{ChessMove, GameState};
 use state_bitboard::{BitBoardState, BoardStateNumbers};
 
+// !add conditional compilation for tests
+#[cfg(test)]
+mod state_bitboard_tests;
+
 
 pub struct GetMoveResult{
     chess_move: ChessMove,
@@ -258,17 +262,16 @@ impl Engine{
             //Maybe maybe not
             let extension = 0;
 
-
             /*if self.is_check(bit_board_state, &chess_move) && depth == 1{
                 extension += 1;
             }*/
+ 
+            let mut result = self.search(&mut bit_board_state.perform_move(chess_move), depth-1+extension, alpha, beta, true_depth +1, false, match_history);    
+            
+            /*if true_depth == 0 {
+                result.0 += rand::random_range(-2..2); //add some randomness to top level moves to avoid always playing the same move in equal positions
+            }*/
 
-            
-
-            
-            let mut result = self.search(&mut bit_board_state.perform_move(chess_move), depth-1+extension, alpha, beta, true_depth +1, false, match_history);
-            
-            
             if let Some(max_time) = self.max_time{
                 if self.start_time.elapsed().unwrap().as_millis() > max_time{
                     self.search_stopped = true;
@@ -281,7 +284,6 @@ impl Engine{
             }else if result.0 <= -1000{
                 result.0 += 1;
             }
-
 
             if result.0 >= max{
                 
@@ -344,10 +346,9 @@ impl Engine{
 
             move_placement += 1;
         }
+
         self.average_best_move_index_placement += 1;
         self.average_best_move_placement += (best_move_placement as f64 - self.average_best_move_placement)/self.average_best_move_index_placement as f64;
-
-
 
         match_history.pop();
         if bit_board_state.white_to_move(){

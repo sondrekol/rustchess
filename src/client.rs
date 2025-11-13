@@ -5,32 +5,33 @@ use licheszter::models::board::Event;
 
 
 use std::env;
-use rand::Rng;
-
 mod game;
+
+static BOTS: [&str; 3] = ["GarboBot", "Jibbby", "halcyonbot"];
 
 
 async fn attempt_challenge(client:& Licheszter) {
     let options = ChallengeOptions::new()
         .rated(true)
-        .clock(60, 0);
+        .clock(60, 1);
 
 
     loop{
-        let mut bot_stream = client.bots_online(5).await.unwrap();
-        while let Some(Ok(bot)) = bot_stream.next().await{
+        //let mut bot_stream = client.bots_online(3).await.unwrap();
+        for bot in BOTS.iter() {
     
-            println!("Found online bot: {} ({})", &bot.username, &bot.id);
-            let bot_i = rand::random_range(0..5);
+            println!("Found online bot: {}", *bot);
+            let bot_i = rand::random_range(0..3);
             if bot_i != 0 {continue;} 
             
             
-            match client.challenge_create(&bot.username, Some(&options)).await {
+            match client.challenge_create(*bot, Some(&options)).await {
                 Ok(challenge) => {
-                    println!("Challenge sent to {} with ID: {}", &bot.username, challenge.id);
+                    println!("Challenge sent to {} with ID: {}", *bot, challenge.id);
                 }
                 Err(e) => {
                     eprintln!("Failed to send challenge: {}", e);
+                    continue;
                 }
             }
             return;
@@ -73,12 +74,18 @@ async fn handle_event(event: Event, client: &Licheszter) -> u8{
             println!("Game finished with ID: {}", game.id);
             return 0;
         },
+        Event::ChallengeCanceled { challenge } => {
+            println!("Challenge canceled with ID: {}", challenge.id);
+            return 1;
+        },
         _ => {return 1;}
     }
 }
 
 pub async fn li_bot() {
 
+    game::engine::state_bitboard::bit_boards::populate_rook_moves();
+    game::engine::state_bitboard::bit_boards::populate_bishop_moves();
 
     match dotenvy::dotenv().ok() {
         Some(path) => println!("Loaded .env file {}", path.display()),
@@ -90,11 +97,11 @@ pub async fn li_bot() {
         .with_authentication(key)
         .build();
 
-    let mut events = client.connect().await.unwrap();
-
+    
     loop{
         attempt_challenge(&client).await;
-    
+        
+        let mut events = client.connect().await.unwrap();
         while let Some(result) = events.next().await {
             match result {
                 Ok(event) => {

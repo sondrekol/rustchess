@@ -51,12 +51,12 @@ impl GetMoveResult{
 }
 
 pub struct Engine{
-    search_depth: i64,
-    max_depth: usize,
-    num_pos: usize,
-    table: HashMap<BoardStateNumbers, Vec<(ChessMove, i32)>, BuildHasherDefault<FxHasher>>,
-    table_size: usize,
-    start_time: SystemTime,
+    search_depth: i64, //initial search depth, in ply, can be increased with extensions
+    max_depth: usize, //maximum search depth, in ply, hard limit, even if search is extended
+    num_pos: usize, //used to store the number of positions searched in the current search
+    table: HashMap<BoardStateNumbers, Vec<(ChessMove, i32)>, BuildHasherDefault<FxHasher>>, //transposition table storing best moves for positions, from previous searches
+    table_size: usize, //size of transposition table
+    start_time: SystemTime, 
     average_best_move_placement: f64,
     average_best_move_index_placement: u64,
     search_stopped: bool,
@@ -211,7 +211,7 @@ impl Engine{
         let board_state_numbers = bit_board_state.board_state_numbers();
 
         //check for draw by repetition
-        if match_history.iter().filter(|&n| *n == board_state_numbers).count() == 2{
+        if match_history.iter().filter(|&n| *n == board_state_numbers).count() == 3{
             return (0, ChessMove::new_empty()); 
         }
 
@@ -257,6 +257,8 @@ impl Engine{
         let mut best_move_placement: f64 = 0.0;
 
         let move_count = moves.len() as f64;
+
+        
         for chess_move in moves{
 
             //Maybe maybe not

@@ -1,8 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use core::num;
-    use std::alloc::System;
-    use std::str::Bytes;
+
     use std::time::SystemTime;
 
     use board::{BoardState, ChessMove};
@@ -47,7 +45,7 @@ mod tests {
         let board_state = BoardState::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         let mut bit_board_state = BitBoardState::new();
         bit_board_state.setup_state(&board_state);
-        let moves = bit_board_state.gen_moves_legal();
+        bit_board_state.gen_moves_legal();
     }
 
     #[test]
@@ -69,7 +67,7 @@ mod tests {
             let chess_move_list = bit_board_state.gen_moves_legal();
             let moves = chess_move_list.moves_vec();
             let legal_move_count = moves.len();
-            if(legal_move_count != expected[i]){
+            if legal_move_count != expected[i] {
                 println!("debug");
                 for chess_move in moves{
                     println!("move: origin: {}, target: {}, flag: {}", string_square(chess_move.origin()), string_square(chess_move.target()), chess_move.flag());
@@ -77,49 +75,6 @@ mod tests {
             }
             assert_eq!(legal_move_count, expected[i], "failed for {fen}");
         }
-    }
-
-    // !disabled because old move gen is deleted
-    /*#[test]
-    fn number_of_legal_moves_against_old() {
-        setup_sliding_magics();
-        let fens = [
-            "8/1PP1PK2/P2Bn3/3R4/1N3p2/1p5p/7Q/1nr2k2 w - - 0 1",
-            "3b4/3Bn1BP/3N4/3P2k1/2K5/P6p/2P3Np/2q3r1 w - - 0 1",
-            "k6q/4pp2/PP6/2bp1B2/Pr6/8/2P3K1/N1B1N3 w - - 0 1",
-            "1B6/1P3N2/8/3b2bP/B2K4/P4ppp/2pk3P/1Q6 w - - 0 1",
-            "2q5/b6p/PRp2P1K/8/p1P4P/2N1B2P/7P/7k w - - 0 1",
-            "8/NPKp4/r2B2P1/5p2/1P6/pkn2qr1/2p1P3/8 w - - 0 1",
-            "8/1Rp2Pq1/5BPP/Kp1P4/3R4/4p3/3Pr1P1/3k4 w - - 0 1",
-            "2Q2K2/1p2PB2/NpP3rP/2Pp3b/2p5/1kP1P1B1/p3R2p/2b3rq w - - 0 1",
-            "1N1b4/R1p2bPp/Kn3p2/3kP3/3P4/2Q1BP2/pP1PP1q1/4R1nr w - - 0 1",
-            "3b4/3PP1pb/P2pK1B1/Nr3p2/2PpPP1N/1R3Q1r/P4p2/k3n3 w - - 0 1",
-            "bBk5/p1Pn1N1P/P2p4/1B3Pr1/n4Rpp/1K3p2/1b1Pp3/4q1r1 w - - 0 1", 
-            "1Nk2q2/Kpp2pPr/1P1bP2P/3PP3/PnRPnpp1/2rQ3p/bNpp1R2/4BB2 w - - 0 1",
-            "1Nq4r/3PPpRp/r1P1nK1p/2P1p1PQ/2pp1B1p/N1Rb2pB/2PP1kP1/b4n2 w - - 0 1"
-            ];
-
-        for fen in fens{
-            let mut pos = BoardState::new_from_fen(fen);
-            let mut bit_board_state = BitBoardState::new();
-            bit_board_state.setup_state(&pos);
-            let chess_move_list = bit_board_state.gen_moves_legal();
-            let moves = chess_move_list.moves_vec();
-            let legal_move_count = moves.len();
-            let expected = pos.legal_move_count();
-            if legal_move_count != expected {
-                println!("debug");
-                for chess_move in moves{
-                    println!("move: origin: {}, target: {}, flag: {}", string_square(chess_move.origin()), string_square(chess_move.target()), chess_move.flag());
-                }
-            }
-            assert_eq!(legal_move_count, expected, "failed for {fen}");
-        }
-    }*/
-
-    fn move_string(chess_move:&ChessMove) -> String{
-        let mov = chess_move.move_data();
-        return format!("{}->{} flag: {}", string_square((mov&0b111111)as u8), string_square(((mov >> 6)&0b111111)as u8), ((mov >> 12)&0b001111)as u8)
     }
 
 
@@ -205,14 +160,6 @@ mod tests {
 
     }
 
-    fn readable_chess_moves(chess_moves:&Vec<ChessMove>) -> Vec<String>{
-        let mut result = Vec::<String>::new();
-        for chess_move in chess_moves{
-            result.push(move_string(chess_move));
-        }
-
-        return result;
-    }
 
     fn perft_verbose(bit_board_state:&mut BitBoardState, depth:usize) -> usize{
         if depth == 0{
@@ -245,63 +192,7 @@ mod tests {
         assert_eq!(perft_verbose(&mut bit_board_state, 3), 531);// !doesnt match
     }
 
-    #[test]
-    fn perform_moves(){
-        let board_state = BoardState::new_from_fen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 1 1");
-        let mut bit_board_state = BitBoardState::new();
-        bit_board_state.setup_state(&board_state);
-        let before = bit_board_state.piece_bb();
-        for chess_move in bit_board_state.gen_moves_legal().moves_vec(){
-            println!("{}", move_string(&chess_move));
-            let after = bit_board_state.perform_move(chess_move).piece_bb();
-            println!("move done");
-        }
-    }
 
-    /*#[test]
-    fn perft_test_single(){
-        setup_sliding_magics();
-        let fen = "r3q1kr/p1p2pbp/Qpb1pnp1/3p4/3P4/2B1PPP1/PPP3BP/RN2K2R w KQ - 75 54";
-        let board_state = BoardState::new_from_fen(fen);
-        let mut bit_board_state = BitBoardState::new();
-        bit_board_state.setup_state(&board_state);
-        assert_eq!(perft_verbose(&mut bit_board_state.perform_move(ChessMove::new_exact(0b0110000000000000)), 1), 53);
-    }*/
-
-    #[test]
-    fn perform_move_test2(){
-        let fen = "8/2p5/3p4/1P5r/1K3p2/6k1/4P1P1/1R6 b - - 3 2";
-        let board_state = BoardState::new_from_fen(fen);
-        let mut bit_board_state = BitBoardState::new();
-        bit_board_state.setup_state(&board_state);
-        let chess_move = ChessMove::from_indices(0b1111, 22, 31);
-        let bit_board_state_performed = bit_board_state.perform_move(chess_move);
-
-        let fen = "8/2p5/3p4/1P5r/1K3p1k/8/4P1P1/1R6 w - - 4 3";
-        let board_state = BoardState::new_from_fen(fen);
-        let mut bit_board_state_exact = BitBoardState::new();
-        bit_board_state_exact.setup_state(&board_state);
-
-        println!("{}",move_string_short(&chess_move));
-        println!("stop here");
-        
-    }
-
-   /*  #[test]
-    fn game_state_test(){
-        let board_state = BoardState::new_from_fen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 1 1");
-        let mut bit_board_state = BitBoardState::new();
-        bit_board_state.setup_state(&board_state);
-        let start = SystemTime::now();
-        for i in 0..10000{
-
-            for chess_move in bit_board_state.gen_moves_legal().moves_vec(){
-                let mut after = bit_board_state.perform_move(chess_move);
-                after.game_state();
-            }
-        }
-        println!("{}", start.elapsed().unwrap().as_millis());
-    }*/
 
     fn move_string_short(chess_move:&ChessMove) -> String{
         return format!("{}{} f({})", string_square(chess_move.origin()), string_square(chess_move.target()), chess_move.flag()); 

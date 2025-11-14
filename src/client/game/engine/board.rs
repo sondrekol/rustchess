@@ -123,13 +123,6 @@ impl ChessMove{
         return self.move_data;
     }
 
-    pub fn new_exact(data:u16) -> Self{
-        Self { 
-            move_data: data,
-            promising_level: 0
-        }
-    }
-
 
     
     pub fn from_uci(uci_move:&str, board_state:&BoardState) -> Self{

@@ -19,10 +19,10 @@ pub struct Game{
 }
 
 const BOT_NAME:&str = "sonkolbot";
-const TABLE_SIZE:usize = 1000000;
+const TABLE_SIZE:usize = 10000000;
 const SEARCH_DEPTH:i64 = 10;
 const MAX_DEPTH:usize = 20;
-const MAX_TIME:Option<u128> = Some(2000);
+const MAX_TIME:Option<u128> = Some(15000);
 const STARTING_POS:&str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 /*
 game handler for a specific game
@@ -32,11 +32,12 @@ game handler for a specific game
 fn log_search(move_result: GetMoveResult){
     let chess_move = move_result.chess_move();
     let uci_move = lan_move(*chess_move);
-    println!("Move: {:>1} | eval: {:>6} | depth: {:>1} | nodes: {:>9}",
+    println!("Move: {:>1} | eval: {:>6} | depth: {:>1} | max depth: {:>1} |nodes: {:>9}",
         uci_move,
         move_result.eval(),
         move_result.depth_reached(),
-        move_result.num_pos()
+        move_result.max_depth_reached(),
+        move_result.num_pos(),
     );
 }
 
@@ -45,8 +46,8 @@ impl Game{
         Self { game_id }
     }
 
-    async fn play_move(&self, client:&Licheszter, bot: &engine::Engine, bb_state:&BitBoardState, game_history:&mut Vec<BoardStateNumbers>) {
-        let search_result = bot.clone().get_move_bb(*bb_state, game_history);
+    async fn play_move(&self, client:&Licheszter, bot: &mut engine::Engine, bb_state:&BitBoardState, game_history:&mut Vec<BoardStateNumbers>) {
+        let search_result = bot.get_move_bb(*bb_state, game_history);
         let uci_move = lan_move(*search_result.chess_move());
         log_search(search_result);
         
@@ -80,7 +81,7 @@ impl Game{
         let mut game_events = client.bot_game_connect(&self.game_id).await.unwrap();
 
         //assuming that previous line indicates that the game has started
-        let bot = engine::Engine::new(SEARCH_DEPTH, MAX_DEPTH, TABLE_SIZE, MAX_TIME);
+        let mut bot = engine::Engine::new(SEARCH_DEPTH, MAX_DEPTH, TABLE_SIZE, MAX_TIME);
         let mut board_state = board::BoardState::new_from_fen(STARTING_POS);
         let mut game_history = Vec::<BoardStateNumbers>::new();
 
@@ -115,10 +116,10 @@ impl Game{
 
                             if moves.len() % 2 == bot_color {
                                 //it is bots turn, last move was opponents
-                                self.play_move(&client, &bot, &bb_state, &mut game_history).await;
+                                println!("Opponent played move: {}, interpreted as {}, raw = {:x}", last_move, lan_move(chess_move), chess_move.move_data());
+                                self.play_move(&client, &mut bot, &bb_state, &mut game_history).await;
                             }
                             else{
-                                println!("Opponent played move: {}, interpreted as {}, raw = {:x}", last_move, lan_move(chess_move), chess_move.move_data());
                             }
                         },
                         BoardState::GameFull(game_state) => {
@@ -130,7 +131,7 @@ impl Game{
 
                             if game_state.white.name == BOT_NAME {
                                 bot_color = 0;
-                                self.play_move(&client, &bot, &bb_state, &mut game_history).await;
+                                self.play_move(&client, &mut bot, &bb_state, &mut game_history).await;
                             }
                             else if !game_state.state.moves.is_empty(){
 
@@ -147,7 +148,7 @@ impl Game{
                                 let mut bb_state = BitBoardState::new();
                                 bb_state.setup_state(&board_state);
                                 game_history.push(bb_state.board_state_numbers());
-                                self.play_move(&client, &bot, &bb_state, &mut game_history).await;
+                                self.play_move(&client, &mut bot, &bb_state, &mut game_history).await;
                             }
                         },
                         BoardState::ChatLine(chat)=>{

@@ -27,11 +27,12 @@ pub struct GetMoveResult{
     searched_positions: usize,
     eval: i32,
     depth_reached: u32,
+    max_depth_reached: usize,
 }
 
 impl GetMoveResult{
-    pub fn new(chess_move:ChessMove, searched_positions:usize, eval:i32, depth_reached: u32) -> Self{
-        Self { chess_move: chess_move, searched_positions: searched_positions, eval: eval, depth_reached: depth_reached}
+    pub fn new(chess_move:ChessMove, searched_positions:usize, eval:i32, depth_reached: u32, max_depth_reached: usize) -> Self{
+        Self { chess_move: chess_move, searched_positions: searched_positions, eval: eval, depth_reached: depth_reached, max_depth_reached: max_depth_reached }
     }
 
     pub fn chess_move(&self) -> &ChessMove{
@@ -48,6 +49,10 @@ impl GetMoveResult{
     pub fn depth_reached(&self) -> u32{
         return self.depth_reached;
     }
+
+    pub fn max_depth_reached(&self) -> usize{
+        return self.max_depth_reached;
+    }
 }
 
 pub struct Engine{
@@ -60,7 +65,8 @@ pub struct Engine{
     average_best_move_placement: f64,
     average_best_move_index_placement: u64,
     search_stopped: bool,
-    max_time: Option<u128>
+    max_time: Option<u128>,
+    max_depth_reached: usize,
 }
 
 
@@ -77,13 +83,22 @@ impl Engine{
             average_best_move_placement: 0.0,
             average_best_move_index_placement: 0,
             search_stopped: false,
-            max_time: max_time
+            max_time: max_time,
+            max_depth_reached: 0,
             
         }
     }
     
     pub fn get_move_bb(&mut self, board_state:BitBoardState, match_history:&mut Vec<BoardStateNumbers>) -> GetMoveResult{
+
+
+        self.num_pos = 0;
+        self.search_stopped = false;
+        self.average_best_move_index_placement = 0;
+        self.average_best_move_placement = 0.0;
         self.start_time = SystemTime::now();
+        self.max_depth_reached = 0;
+
 
         let mut bit_board_state = board_state;
         let mut best_move:ChessMove = ChessMove::new_empty();
@@ -93,8 +108,10 @@ impl Engine{
         for i in 2..self.search_depth+1{
             depth = i as u32;
             self.num_pos = 0;
+            let last_board_state = match_history.pop().unwrap();
             let search_result = self.search(&mut bit_board_state, i, i32::MIN, i32::MAX, 0, true, match_history);
-            //self.table.clear();
+            match_history.push(last_board_state);
+
             if self.search_stopped {
                 break;
             }
@@ -108,7 +125,8 @@ impl Engine{
             best_move,
             self.num_pos,
             best_eval,
-            depth
+            depth,
+            self.max_depth_reached
         );
     }
 
@@ -197,7 +215,9 @@ impl Engine{
 
     fn search(&mut self, bit_board_state:&mut BitBoardState, depth:i64, mut alpha:i32, mut beta:i32, true_depth:usize, _first: bool, match_history:&mut Vec<BoardStateNumbers>) -> (i32, ChessMove){
 
-
+        if true_depth > self.max_depth_reached{
+            self.max_depth_reached = true_depth;
+        }
 
         let game_state = bit_board_state.game_state();
         match game_state{
@@ -210,13 +230,15 @@ impl Engine{
 
         let board_state_numbers = bit_board_state.board_state_numbers();
 
+        match_history.push(board_state_numbers);
+
         //check for draw by repetition
         if match_history.iter().filter(|&n| *n == board_state_numbers).count() == 3{
+            match_history.pop();
             return (0, ChessMove::new_empty()); 
         }
 
 
-        match_history.push(board_state_numbers);
         
 
         if depth <= 0 || true_depth >= self.max_depth{
@@ -258,15 +280,24 @@ impl Engine{
 
         let move_count = moves.len() as f64;
 
-        
-        for chess_move in moves{
+
+        let mut cur_move_index = 0;
+        let total_moves = moves.len();
+
+        for &chess_move in moves.iter(){
 
             //Maybe maybe not
-            let extension = 0;
+            let mut extension = 0;
 
-            /*if self.is_check(bit_board_state, &chess_move) && depth == 1{
-                extension += 1;
-            }*/
+            if cur_move_index <= 2 && true_depth < 3{ //add extensions for the most promising moves
+                extension = 1;
+                if chess_move.promising_level().abs() >= 1000{//extra extension if this was calculated as best move previously
+                    extension = 2;
+                }
+            }
+            else if total_moves-cur_move_index < 10 && true_depth < 2{
+                extension = -1;
+            }
  
             let mut result = self.search(&mut bit_board_state.perform_move(chess_move), depth-1+extension, alpha, beta, true_depth +1, false, match_history);    
             
@@ -281,12 +312,14 @@ impl Engine{
                 }
             }
 
+            //makes sure that the bot choses the fastest checkmate available
             if result.0 >= 1000 {
                 result.0 -= 1;
             }else if result.0 <= -1000{
                 result.0 += 1;
             }
 
+            // !TODO: !Clean up this DRY violation
             if result.0 >= max{
                 
                 if !(result.0 == 0 && max > -30){//dont go for draw in a roughly equal position
@@ -347,6 +380,7 @@ impl Engine{
             }
 
             move_placement += 1;
+            cur_move_index += 1;
         }
 
         self.average_best_move_index_placement += 1;
@@ -374,7 +408,8 @@ impl Clone for Engine{
             average_best_move_placement: 0.0,
             average_best_move_index_placement: 0,
             search_stopped: false,
-            max_time: self.max_time
+            max_time: self.max_time,
+            max_depth_reached: 0,
         }
     }
 }

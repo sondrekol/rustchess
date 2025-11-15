@@ -13,7 +13,7 @@ static BOTS: [&str; 3] = ["GarboBot", "Jibbby", "halcyonbot"];
 async fn attempt_challenge(client:& Licheszter) {
     let options = ChallengeOptions::new()
         .rated(true)
-        .clock(60, 1);
+        .clock(900, 10);
 
 
     loop{

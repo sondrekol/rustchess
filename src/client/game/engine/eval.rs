@@ -382,7 +382,7 @@ pub fn evaluate(bit_board_state:&BitBoardState) -> i32{
             )*20;
     eval += (king_safety(&pieces[WHITE], &pieces[BLACK], WHITE) -
             king_safety(&pieces[BLACK], &pieces[WHITE], BLACK))
-            *35;
+            *50;
 
     return eval;
 }

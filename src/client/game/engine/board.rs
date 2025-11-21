@@ -70,7 +70,7 @@ pub enum GameState{
 
 pub struct ChessMove{
     move_data:u16,
-    promising_level:i16
+    pub promising_level:i16
 }
 
 
@@ -273,21 +273,24 @@ impl ChessMoveList{
         return self.size as usize;
     }
 
-    pub fn get(&self, index:usize) -> ChessMove{
-        return self.chess_moves[index];
+    pub fn get_mut(&self, index:usize) -> &ChessMove{
+        return &self.chess_moves[index];
     }
 
 
-    pub fn sort(&mut self) {
+    pub fn sort<F>(&mut self, score:F) 
+    where 
+    F: Fn(&ChessMove) -> i32
+    {
         let n = self.size as usize;
         if n <= 1 { return; }
 
-        // Insertion sort is good enough because of small size
+        // Insertion sort is good enough for now because of small size
         for i in 1..n {
             let key = self.chess_moves[i];
             let mut j = i;
             // Sort by promising_level descending (higher is better)
-            while j > 0 && self.chess_moves[j - 1].promising_level < key.promising_level {
+            while j > 0 && score(&self.chess_moves[j - 1]) < score(&key) {
                 self.chess_moves[j] = self.chess_moves[j - 1];
                 j -= 1;
             }
@@ -295,7 +298,9 @@ impl ChessMoveList{
         }
     }
 
-    pub fn retain(&self, pred:fn(&ChessMove) -> bool) -> ChessMoveList{
+    pub fn retain<F>(&self, pred:F) -> ChessMoveList
+    where F: Fn(&ChessMove) -> bool,
+    {
         let mut retained:ChessMoveList = ChessMoveList::new();
 
         for i in 0..self.size {
@@ -323,7 +328,6 @@ impl ChessMoveList{
     }
 
 }
-
 
 
 impl Clone for ChessMoveList{

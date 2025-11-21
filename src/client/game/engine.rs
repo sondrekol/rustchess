@@ -157,40 +157,37 @@ impl Engine{
             GameState::Playing => {}
         }
 
-        let mut moves = bit_board_state.gen_moves_legal().moves_vec();
+        let mut moves = bit_board_state.gen_moves_legal();
 
-        let mut retain_pred:fn(&ChessMove)->bool;
-        moves.retain(|m|{
-            is_capture(bit_board_state, m)
-        });
-        //moves should only contain captures at this point
 
-        //after initial capture, only check if can capture back, dont check any potential "danger level captures"
         if let Some(capture_square) = opt_capture_square{
-            moves.retain(|m|{
-                m.target() == capture_square
+            moves = moves.retain(|m|{
+                m.target() == capture_square && is_capture(bit_board_state, m)
+            });
+        }else{
+            moves = moves.retain(|m|{
+                is_capture(bit_board_state, m)
             });
         }
 
-
         let this_eval = self.evaluate(bit_board_state);
         //if there are no more captures available, return the evaluation
-        if moves.len() == 0 {
+        if moves.size() == 0 {
             return this_eval;
         }
 
-        moves.sort_by(|a, b| 
-            capture_score(bit_board_state, a)
-            .cmp(&capture_score(bit_board_state, b))
-            .reverse()
-            );
+
+
+        moves.sort(|m|{
+            -capture_score(bit_board_state, m)
+        });
 
         //capture search works on the assumption that a player does not need to make a capture
         let mut min = this_eval;
         let mut max = this_eval;
 
-
-        for capture in moves{
+        for i in 0..moves.size(){
+            let &capture = moves.get_mut(i);
 
             let mut result = self.capture_search(&mut bit_board_state.perform_move(capture), alpha, beta, capture_depth+1, Some(capture.target()));
 

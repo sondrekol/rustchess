@@ -230,13 +230,13 @@ fn endgame_factor(pieces:&[[u64; 6]; 2]) -> i32{
  * PUBLIC FUNCTIONS
  */
 
-pub fn capture_score(bit_board_state:&mut BitBoardState, capture: &ChessMove) -> i32{
+pub fn capture_score(bit_board_state:&BitBoardState, capture: &ChessMove) -> i32{
     let origin_value = bit_board_state.piece_value(capture.origin()as usize).abs();
     let target_value = bit_board_state.piece_value(capture.target()as usize).abs();
     return target_value - origin_value/10;
 }
 
-pub fn is_capture(bit_board_state:&mut BitBoardState, m: &ChessMove) -> bool{
+pub fn is_capture(bit_board_state:&BitBoardState, m: &ChessMove) -> bool{
     match m.flag(){
         B_CASTLE_KING | B_CASTLE_QUEEN | W_CASTLE_KING | W_CASTLE_QUEEN => {return false;}//castle is never a capture
         WHITE_EN_PASSANT | BLACK_EN_PASSANT => {return true;}//en passant is allways a capture

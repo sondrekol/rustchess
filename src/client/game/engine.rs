@@ -19,7 +19,7 @@ use state_bitboard::{BitBoardState, BoardStateNumbers};
 
 use crate::client::game::engine::eval::{game_state, is_check};
 
-// !add conditional compilation for tests
+
 #[cfg(test)]
 mod state_bitboard_tests;
 
@@ -156,7 +156,7 @@ impl Engine{
             GameState::Draw => {return 0}
             GameState::Playing => {}
         }
-
+        
         let mut moves = bit_board_state.gen_moves_legal();
 
 
@@ -252,7 +252,9 @@ impl Engine{
         for i in 0..moves.len(){
             promising_move(bit_board_state, &mut moves[i], previous_best_moves);
         }
+
         self.table.insert(board_state_numbers, Vec::<(ChessMove, i32)>::new());
+
         moves.sort_unstable_by(|a, b| 
                 a.promising_level()
                 .cmp(&b.promising_level())
@@ -298,6 +300,7 @@ impl Engine{
             
 
             // ! check for time limit exceeded
+            // ! a little bit costly, find som other way of doing this maybe
             if let Some(max_time) = self.max_time{
                 if self.start_time.elapsed().unwrap().as_millis() > max_time{
                     self.search_stopped = true;
@@ -313,6 +316,7 @@ impl Engine{
             }
 
             // ! update best move/eval
+            // ! DRY
             if result.0 >= max{
                 
                 if !(result.0 == 0 && max > -30){//dont go for draw in a roughly equal position

@@ -1,17 +1,8 @@
-
 use std::{hash::{Hash, Hasher}, fmt};
-
-use futures::stream::futures_unordered::Iter;
 
 use super::move_string::lan_move;
 
-
-
 //Piece codes
-
-
-
-
 const PIECE_PAWN: u8 = 0b00000001;
 const PIECE_KNIGHT: u8 = 0b00000010;
 const PIECE_BISHOP: u8 = 0b00000011;
@@ -67,23 +58,21 @@ pub enum GameState{
     Draw
 }
 
-
 pub struct ChessMove{
     move_data:u16,
     pub promising_level:i16
 }
-
 
 impl Hash for ChessMove{
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.move_data.hash(state);
     }
 }
+
 pub struct ChessMoveList{
     size: u8,
     chess_moves: [ChessMove; 218]
 }
-
 
 pub struct BoardState{
     pieces: [u8; 64],

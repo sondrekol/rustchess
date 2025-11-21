@@ -261,6 +261,7 @@ pub fn promising_move(bit_board_state:&mut BitBoardState, chess_move: &mut Chess
     let color_value = if origin_value < 0 {-1} else {1};
 
 
+    // ! this turns what should have been a constant operation into a linear one, allthough n is quite small here
     if let Some(best_moves) = best_moves_option{
         for good_move in best_moves {
             if *chess_move == good_move.0 {
@@ -271,10 +272,6 @@ pub fn promising_move(bit_board_state:&mut BitBoardState, chess_move: &mut Chess
         }
     }
 
-    
-
-
-    //?I dont understand the unsused variable warnings here, TODO: fix later
     match chess_move.flag(){
         board::NO_FLAG => {
             if target_value != 0{ //is a capture
@@ -285,7 +282,7 @@ pub fn promising_move(bit_board_state:&mut BitBoardState, chess_move: &mut Chess
                 
                  */
                 promising_level += -target_value*10; //add value of captured piece
-                promising_level -= origin_value //subtract value/10 of capturing piece
+                promising_level -= origin_value*10 //subtract value of capturing piece
             }else{ // for non captures
 
                 if origin_value == 10{
@@ -395,6 +392,7 @@ pub fn evaluate(bit_board_state:&BitBoardState) -> i32{
     eval += (rook_score(pieces[WHITE][ROOK], pieces[WHITE][PAWN], piece_mask) -
             rook_score(pieces[BLACK][ROOK], pieces[BLACK][PAWN], piece_mask)
             )*20;
+            
     eval += (king_safety(&pieces[WHITE], &pieces[BLACK], WHITE) -
             king_safety(&pieces[BLACK], &pieces[WHITE], BLACK))
             *50;

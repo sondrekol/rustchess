@@ -17,6 +17,8 @@ use fxhash::FxHasher;
 use board::{ChessMove, GameState};
 use state_bitboard::{BitBoardState, BoardStateNumbers};
 
+use crate::client::game::engine::eval::{game_state, is_check};
+
 // !add conditional compilation for tests
 #[cfg(test)]
 mod state_bitboard_tests;
@@ -104,12 +106,18 @@ impl Engine{
         let mut best_move:ChessMove = ChessMove::new_empty();
         let mut best_eval:i32 = 0;
         let mut depth = 0;
+        let mut use_extensions = false;
         
         for i in 2..self.search_depth+1{
+            
+            if i >= 5 {
+                use_extensions = true;
+            }
+
             depth = i as u32;
-            self.num_pos = 0;
+
             let last_board_state = match_history.pop().unwrap();
-            let search_result = self.search(&mut bit_board_state, i, i32::MIN, i32::MAX, 0, true, match_history);
+            let search_result = self.search(&mut bit_board_state, i, i32::MIN, i32::MAX, 0, true, match_history, use_extensions);
             match_history.push(last_board_state);
 
             if self.search_stopped {
@@ -119,6 +127,7 @@ impl Engine{
             if search_result.0 < 30000 && search_result.0 > -30000 {//if depth stopped before calculating the evaluation of the best move, use the previous
                 best_eval = search_result.0;
             }
+            
         }
 
         return GetMoveResult::new(
@@ -150,11 +159,11 @@ impl Engine{
 
         let mut moves = bit_board_state.gen_moves_legal().moves_vec();
 
+        let mut retain_pred:fn(&ChessMove)->bool;
         moves.retain(|m|{
             is_capture(bit_board_state, m)
         });
         //moves should only contain captures at this point
-
 
         //after initial capture, only check if can capture back, dont check any potential "danger level captures"
         if let Some(capture_square) = opt_capture_square{
@@ -162,8 +171,10 @@ impl Engine{
                 m.target() == capture_square
             });
         }
+
+
         let this_eval = self.evaluate(bit_board_state);
-        //if there are no more captures available, return the piece count
+        //if there are no more captures available, return the evaluation
         if moves.len() == 0 {
             return this_eval;
         }
@@ -174,7 +185,7 @@ impl Engine{
             .reverse()
             );
 
-        //at worst either player can choose to not capture
+        //capture search works on the assumption that a player does not need to make a capture
         let mut min = this_eval;
         let mut max = this_eval;
 
@@ -195,10 +206,10 @@ impl Engine{
             if result < min{
                 min = result;
             }
-            if max > alpha{
+            if max > alpha && bit_board_state.white_to_move(){
                 alpha = max;
             }
-            if min < beta{
+            if min < beta && !bit_board_state.white_to_move(){
                 beta = min;
             }
             if alpha > beta{
@@ -213,55 +224,38 @@ impl Engine{
         }
     }
 
-    fn search(&mut self, bit_board_state:&mut BitBoardState, depth:i64, mut alpha:i32, mut beta:i32, true_depth:usize, _first: bool, match_history:&mut Vec<BoardStateNumbers>) -> (i32, ChessMove){
+    fn search(&mut self, bit_board_state:&mut BitBoardState, depth:i64, mut alpha:i32, mut beta:i32, true_depth:usize, _first: bool, match_history:&mut Vec<BoardStateNumbers>, use_extensions: bool) -> (i32, ChessMove){
 
+        // ! cancel search once depth is reached
+        if depth <= 0 || true_depth >= self.max_depth{
+            return (self.capture_search(bit_board_state, alpha, beta, 0, None), ChessMove::new_empty());
+        }
+
+        // ! Statistics
         if true_depth > self.max_depth_reached{
             self.max_depth_reached = true_depth;
         }
+        let mut move_placement = 0;
+        let mut best_move_placement: f64 = 0.0;
 
-        let game_state = bit_board_state.game_state();
-        match game_state{
+        // ! check for mate, stalemate or if still playing, uses number of legal moves to determine state
+        match game_state(bit_board_state, match_history){
             GameState::Black => {return (-10000, ChessMove::new_empty())}
             GameState::White => {return (10000, ChessMove::new_empty())}
             GameState::Draw => {return (0, ChessMove::new_empty())}
             GameState::Playing => {}
         }
+    
 
 
-        let board_state_numbers = bit_board_state.board_state_numbers();
-
-        match_history.push(board_state_numbers);
-
-        //check for draw by repetition
-        if match_history.iter().filter(|&n| *n == board_state_numbers).count() == 3{
-            match_history.pop();
-            return (0, ChessMove::new_empty()); 
-        }
-
-
-        
-
-        if depth <= 0 || true_depth >= self.max_depth{
-            match_history.pop();
-            return (self.capture_search(bit_board_state, alpha, beta, 0, None), ChessMove::new_empty());
-        }
+        // ! retrive moves in position
         let mut moves = bit_board_state.gen_moves_legal().moves_vec();
-
-        
-        
-
+        let board_state_numbers = bit_board_state.board_state_numbers();
         let previous_best_moves = self.table.get(&board_state_numbers);
-
-        //add promising level to the moves for later sorting
         for i in 0..moves.len(){
             promising_move(bit_board_state, &mut moves[i], previous_best_moves);
         }
-
         self.table.insert(board_state_numbers, Vec::<(ChessMove, i32)>::new());
-        
-        //at this point previous_best_moves_mut should contain an empty vec
-
-        //Sort moves by how promising they are
         moves.sort_unstable_by(|a, b| 
                 a.promising_level()
                 .cmp(&b.promising_level())
@@ -270,41 +264,43 @@ impl Engine{
             moves.reverse();
         }
         
+        // ! best eval/move variables
         let mut min:i32 = i32::MAX;
         let mut max:i32 = i32::MIN;
         let mut min_move:ChessMove = *moves.get(0).unwrap();
         let mut max_move:ChessMove = *moves.get(0).unwrap();
 
-        let mut move_placement = 0;
-        let mut best_move_placement: f64 = 0.0;
-
+        // ! indices
         let move_count = moves.len() as f64;
-
-
         let mut cur_move_index = 0;
         let total_moves = moves.len();
 
         for &chess_move in moves.iter(){
 
-            //Maybe maybe not
+            // ! extensions and reductions
             let mut extension = 0;
-
-            if cur_move_index <= 2 && true_depth < 3{ //add extensions for the most promising moves
-                extension = 1;
-                if chess_move.promising_level().abs() >= 1000{//extra extension if this was calculated as best move previously
-                    extension = 2;
+            if use_extensions{
+                if cur_move_index <= 2 && true_depth < 3{ //add extensions for the most promising moves
+                    extension = 1;
+                    if chess_move.promising_level().abs() >= 1000{//extra extension if this was calculated as best move previously
+                        extension = 2;
+                    }
+                }
+                if is_check(bit_board_state, &chess_move) && true_depth < 8{
+                    extension+=1;
+                }
+                else if total_moves - cur_move_index < 10 && true_depth < 2{
+                    extension = -1;
                 }
             }
-            else if total_moves-cur_move_index < 10 && true_depth < 2{
-                extension = -1;
-            }
- 
-            let mut result = self.search(&mut bit_board_state.perform_move(chess_move), depth-1+extension, alpha, beta, true_depth +1, false, match_history);    
             
-            /*if true_depth == 0 {
-                result.0 += rand::random_range(-2..2); //add some randomness to top level moves to avoid always playing the same move in equal positions
-            }*/
 
+
+            // ! recursive search call
+            let mut result = self.search(&mut bit_board_state.perform_move(chess_move), depth-1+extension, alpha, beta, true_depth +1, false, match_history, use_extensions);    
+            
+
+            // ! check for time limit exceeded
             if let Some(max_time) = self.max_time{
                 if self.start_time.elapsed().unwrap().as_millis() > max_time{
                     self.search_stopped = true;
@@ -312,34 +308,22 @@ impl Engine{
                 }
             }
 
-            //makes sure that the bot choses the fastest checkmate available
+            // ! makes sure that the bot choses the fastest checkmate available
             if result.0 >= 1000 {
                 result.0 -= 1;
             }else if result.0 <= -1000{
                 result.0 += 1;
             }
 
-            // !TODO: !Clean up this DRY violation
+            // ! update best move/eval
             if result.0 >= max{
                 
                 if !(result.0 == 0 && max > -30){//dont go for draw in a roughly equal position
                     max = result.0;
                     max_move = chess_move;
                     best_move_placement = move_placement as f64/move_count;
-                    
-                    //replace or add best move
-                    let best_moves = self.table.get_mut(&board_state_numbers).unwrap();
-                    let mut found_move: bool = false;
-                    for i in 0..best_moves.len(){
-                        if max_move == best_moves[i].0{
-                            best_moves[i].1 = max;
-                            found_move = true;
-                            break;
-                        }
-                    }
-                    if !found_move{
-                        self.table.get_mut(&board_state_numbers).unwrap().push((max_move, max));
-                    }
+                    self.table.get_mut(&board_state_numbers).unwrap().push((max_move, max));
+
                 }
                 
             }
@@ -348,24 +332,13 @@ impl Engine{
                     min = result.0;
                     min_move = chess_move;
                     best_move_placement = move_placement as f64/move_count;
+                    self.table.get_mut(&board_state_numbers).unwrap().push((min_move, min));
 
-                    //replace or add best move
-                    let best_moves = self.table.get_mut(&board_state_numbers).unwrap();
-                    let mut found_move: bool = false;
-                    for i in 0..best_moves.len(){
-                        if min_move == best_moves[i].0{
-                            best_moves[i].1 = min;
-                            found_move = true;
-                            break;
-                        }
-                    }
-                    if !found_move{
-                        self.table.get_mut(&board_state_numbers).unwrap().push((min_move, min));
-                    }
                 }
 
             }
 
+            // ! alpha-beta pruning
             if bit_board_state.white_to_move() {
                 if max > alpha {
                     alpha = max;
@@ -379,6 +352,7 @@ impl Engine{
                 break;
             }
 
+            // ! statistics
             move_placement += 1;
             cur_move_index += 1;
         }

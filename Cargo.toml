@@ -15,3 +15,6 @@ tokio = "1.48.0"
 
 [profile.test]
 inherits = "release"
+
+[profile.release]
+debug = true

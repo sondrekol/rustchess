@@ -615,7 +615,6 @@ impl BitBoardState{
         let target_bb: u64 = 1<<target;
         let flag: u8 = chess_move.flag();
 
-
         let mut new_piece_bb: [[u64; 6]; 2] = self.piece_bb;
         let mut new_en_passant_square: usize = NO_EN_PASSANT_SQUARE;
         let mut new_en_passant_possible: bool = false;
@@ -836,7 +835,7 @@ impl BitBoardState{
     pub fn game_state(&mut self) -> GameState{
         //use allready calculated moves if possible
         if self.legal_moves_calculated {
-            if self.legal_moves.size_fast() == 0{
+            if self.legal_moves.size() == 0{
                 if self.checkers != 0 { //to move side is in checkmate
                     if self.to_move == WHITE{
                         return GameState::Black;
@@ -855,7 +854,7 @@ impl BitBoardState{
             if self.num_checkers() == 0{
 
                 self.legal_king_moves();
-                let legal_king_moves = self.legal_moves.size_fast();
+                let legal_king_moves = self.legal_moves.size();
                 self.legal_moves.reset();
                 if legal_king_moves >= 1 { 
                     return GameState::Playing;
@@ -863,7 +862,7 @@ impl BitBoardState{
             }
         }
         //finally if all else fails, do a full search of all moves to check if there are 0 legal moves
-        if self.gen_moves_legal().size_fast() == 0{
+        if self.gen_moves_legal().size() == 0{
             if self.checkers != 0 { //to move side is in checkmate
                 if self.to_move == WHITE{
                     return GameState::Black;

@@ -14,8 +14,6 @@ async fn attempt_challenge(client:& Licheszter) {
     let options = ChallengeOptions::new()
         .rated(true)
         .clock(900, 10);
-
-
     loop{
         //let mut bot_stream = client.bots_online(3).await.unwrap();
         for bot in BOTS.iter() {

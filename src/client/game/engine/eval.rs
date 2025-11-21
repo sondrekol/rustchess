@@ -1,17 +1,17 @@
-use crate::client::game::engine::board;
+use crate::client::game::engine::board::{self, GameState};
 /**
  * eval contains all functions meant to statically evaluate a function, mainly trough the function "evaluate"
  * all static evaluation should remain stateless
  * 
  */
-use crate::client::game::engine::state_bitboard::{BISHOP, KNIGHT, PAWN, QUEEN, ROOK};
+use crate::client::game::engine::state_bitboard::{BISHOP, BoardStateNumbers, KNIGHT, PAWN, QUEEN, ROOK};
 
 use super::board::{ChessMove, BLACK_EN_PASSANT, B_CASTLE_KING, B_CASTLE_QUEEN, WHITE_EN_PASSANT, W_CASTLE_KING, W_CASTLE_QUEEN};
 use super::state_bitboard::bit_boards::{file_of, pop_lsb, rank_of, BOARD_CENTER, KING_PAWNS_OPTIMAL, NEIGHBOUR_FILES, RANKS, RANK_1, RANK_8, SEC_TIER_BISHOP, SEC_TIER_PAWN, TOP_TIER_BISHOP, TOP_TIER_PAWN};
 use super::state_bitboard::{bit_boards, BitBoardState, BLACK, KING, WHITE};
 
 
-fn is_check(bit_board_state:&BitBoardState, chess_move: &ChessMove) -> bool{
+pub fn is_check(bit_board_state:&BitBoardState, chess_move: &ChessMove) -> bool{
     /*
     summed up, if we give the moving side an extra tempo, can it capture the king?
      */
@@ -343,6 +343,21 @@ pub fn promising_move(bit_board_state:&mut BitBoardState, chess_move: &mut Chess
     *promising_level_ref = promising_level as i16;
 }
 
+pub fn game_state(bit_board_state:&mut BitBoardState, match_history:&mut Vec<BoardStateNumbers>) -> GameState {
+
+    let game_state = bit_board_state.game_state();
+    if game_state != GameState::Playing {
+        return game_state;
+    }
+
+    let board_state_numbers = bit_board_state.board_state_numbers();
+    match_history.push(board_state_numbers);
+    if match_history.iter().filter(|&n| *n == board_state_numbers).count() == 3{
+        match_history.pop();
+        return GameState::Draw;
+    }
+    GameState::Playing
+}
 
 pub fn evaluate(bit_board_state:&BitBoardState) -> i32{
     let pieces = bit_board_state.piece_bb();

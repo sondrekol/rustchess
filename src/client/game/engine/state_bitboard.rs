@@ -515,6 +515,7 @@ impl BitBoardState{
         }
     }
 
+    //Bitboard of attackers on given square
     fn attackers(&self, pos: usize) -> u64{
 
         //Count rook attackers
@@ -747,6 +748,7 @@ impl BitBoardState{
             }
         }
 
+        
         const WHITE_KING_CASTLE_PIECES:u64 = (1 << 4) | (1 << 7);
         const WHITE_QUEEN_CASTLE_PIECES:u64 = (1 << 4) | (1 << 0);
         const BLACK_KING_CASTLE_PIECES:u64 = (1 << 60) | (1 << 63);

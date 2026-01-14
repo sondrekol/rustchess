@@ -130,14 +130,13 @@ fn rook_score(rooks:u64, pawns:u64, _blockers:u64) -> i32{
 //a slightly less static way of counting material
 //knights are worth more in closed position
 //bishops are worth more in open positions
-//one rook is worth 500, two are 900
 fn dynamic_piece_count(pieces:&[u64; 6], other_pieces:&[u64; 6]) -> i32{
     let mut piece_count:i32 = 0;
 
     //default value for pieces
     const VALUE_PAWN:i32 = 100;
     const VALUE_KNIGHT:i32 = 300;
-    const VALUE_BISHOP:i32 = 340;
+    const VALUE_BISHOP:i32 = 320;
     const VALUES_ROOK:[i32; 10] = [500, 900, 1300, 1700, 2100, 2500, 2900, 3300, 3600, 3900];
     const VALUE_QUEEN:i32 = 900;
 
@@ -233,7 +232,7 @@ fn endgame_factor(pieces:&[[u64; 6]; 2]) -> i32{
 pub fn capture_score(bit_board_state:&BitBoardState, capture: &ChessMove) -> i32{
     let origin_value = bit_board_state.piece_value(capture.origin()as usize).abs();
     let target_value = bit_board_state.piece_value(capture.target()as usize).abs();
-    return target_value - origin_value/10;
+    return target_value - origin_value;
 }
 
 pub fn is_capture(bit_board_state:&BitBoardState, m: &ChessMove) -> bool{
@@ -261,7 +260,7 @@ pub fn promising_move(bit_board_state:&mut BitBoardState, chess_move: &mut Chess
     let color_value = if origin_value < 0 {-1} else {1};
 
 
-    // ! this turns what should have been a constant operation into a linear one, allthough n is quite small here
+    // ! this turns what should have been a constant operation into a linear one, allthough n is usually quite small here
     if let Some(best_moves) = best_moves_option{
         for good_move in best_moves {
             if *chess_move == good_move.0 {
@@ -392,7 +391,7 @@ pub fn evaluate(bit_board_state:&BitBoardState) -> i32{
     eval += (rook_score(pieces[WHITE][ROOK], pieces[WHITE][PAWN], piece_mask) -
             rook_score(pieces[BLACK][ROOK], pieces[BLACK][PAWN], piece_mask)
             )*20;
-            
+
     eval += (king_safety(&pieces[WHITE], &pieces[BLACK], WHITE) -
             king_safety(&pieces[BLACK], &pieces[WHITE], BLACK))
             *50;

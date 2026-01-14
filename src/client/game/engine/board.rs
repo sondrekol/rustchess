@@ -159,7 +159,7 @@ impl ChessMove{
             return Self::from_indices(promote_flag, origin, target);
         }
 
-        if board_state.piece(origin as usize) == PIECE_PAWN {
+        if board_state.piece(origin as usize) & 0b00111111 == PIECE_PAWN {
             if BoardState::vertical_distance(origin, target) == 2 {
                 return Self::from_indices(DOUBLE_PAWN_MOVE, origin, target);
             }

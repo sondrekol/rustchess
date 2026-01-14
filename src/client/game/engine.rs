@@ -179,7 +179,7 @@ impl Engine{
 
 
         moves.sort(|m|{
-            -capture_score(bit_board_state, m)
+            capture_score(bit_board_state, m)
         });
 
         //capture search works on the assumption that a player does not need to make a capture
@@ -288,7 +288,7 @@ impl Engine{
                 if is_check(bit_board_state, &chess_move) && true_depth < 8{
                     extension+=1;
                 }
-                else if total_moves - cur_move_index < 10 && true_depth < 2{
+                else if total_moves - cur_move_index < 10 && true_depth < 4{
                     extension = -1;
                 }
             }

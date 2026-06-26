@@ -1,15 +1,8 @@
-
 use std::{hash::{Hash, Hasher}, fmt};
 
 use super::move_string::lan_move;
 
-
-
 //Piece codes
-
-
-
-
 const PIECE_PAWN: u8 = 0b00000001;
 const PIECE_KNIGHT: u8 = 0b00000010;
 const PIECE_BISHOP: u8 = 0b00000011;
@@ -65,23 +58,21 @@ pub enum GameState{
     Draw
 }
 
-
 pub struct ChessMove{
     move_data:u16,
-    promising_level:i16
+    pub promising_level:i16
 }
-
 
 impl Hash for ChessMove{
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.move_data.hash(state);
     }
 }
+
 pub struct ChessMoveList{
-    index: u8,
+    size: u8,
     chess_moves: [ChessMove; 218]
 }
-
 
 pub struct BoardState{
     pieces: [u8; 64],
@@ -168,7 +159,7 @@ impl ChessMove{
             return Self::from_indices(promote_flag, origin, target);
         }
 
-        if board_state.piece(origin as usize) == PIECE_PAWN {
+        if board_state.piece(origin as usize) & 0b00111111 == PIECE_PAWN {
             if BoardState::vertical_distance(origin, target) == 2 {
                 return Self::from_indices(DOUBLE_PAWN_MOVE, origin, target);
             }
@@ -252,24 +243,68 @@ impl Eq for ChessMove {
 impl ChessMoveList{
     pub fn new() -> Self{
         Self {
-            index: 0, 
+            size: 0, 
             chess_moves: [ChessMove{move_data: 0, promising_level: 0}; 218]
         }
     }
     pub fn add_no_alloc(&mut self, origin:u8, target:u8, flag:u8){
-        self.chess_moves[self.index as usize].move_data = origin as u16 | ((target as u16) << 6) | ((flag as u16) << 12);
-        self.index+= 1;
+        self.chess_moves[self.size as usize].move_data = origin as u16 | ((target as u16) << 6) | ((flag as u16) << 12);
+        self.size+= 1;
+    }
+
+    pub fn add(&mut self, chess_move:ChessMove) {
+        self.chess_moves[self.size as usize] = chess_move;
+        self.size+=1;
     }
 
     //NOTE: this does not work if the moves are mutated
-    pub fn size_fast(&self) -> usize{
-        return self.index as usize;
+    pub fn size(&self) -> usize{
+        return self.size as usize;
+    }
+
+    pub fn get_mut(&self, index:usize) -> &ChessMove{
+        return &self.chess_moves[index];
+    }
+
+
+    pub fn sort<F>(&mut self, score:F) 
+    where 
+    F: Fn(&ChessMove) -> i32
+    {
+        let n = self.size as usize;
+        if n <= 1 { return; }
+
+        // Insertion sort is good enough for now because of small size
+        for i in 1..n {
+            let key = self.chess_moves[i];
+            let mut j = i;
+            // Sort by promising_level descending (higher is better)
+            while j > 0 && score(&self.chess_moves[j - 1]) < score(&key) {
+                self.chess_moves[j] = self.chess_moves[j - 1];
+                j -= 1;
+            }
+            self.chess_moves[j] = key;
+        }
+    }
+
+    pub fn retain<F>(&self, pred:F) -> ChessMoveList
+    where F: Fn(&ChessMove) -> bool,
+    {
+        let mut retained:ChessMoveList = ChessMoveList::new();
+
+        for i in 0..self.size {
+            if pred(&self.chess_moves[i as usize]) {
+                retained.add(self.chess_moves[i as usize]);
+            }
+        }
+
+        return retained;
     }
 
     
     pub fn moves_vec(&self) -> Vec<ChessMove>{
         let mut moves = Vec::<ChessMove>::with_capacity(218);
-        for i in 0..self.index as usize{
+        for i in 0..self.size as usize{
             if self.chess_moves[i].move_data != 0{
                 moves.push(self.chess_moves[i]);
             }
@@ -278,13 +313,15 @@ impl ChessMoveList{
     }
 
     pub fn reset(&mut self) {
-        self.index = 0;
+        self.size = 0;
     }
+
 }
+
 
 impl Clone for ChessMoveList{
     fn clone(&self) -> Self {
-        Self { index: self.index.clone(), chess_moves: self.chess_moves.clone() }
+        Self { size: self.size.clone(), chess_moves: self.chess_moves.clone() }
     }
 }
 

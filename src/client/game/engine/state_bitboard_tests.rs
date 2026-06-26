@@ -83,7 +83,7 @@ mod tests {
             return 0;
         }
         else if depth == 1 {
-            let number_of_moves = bit_board_state.gen_moves_legal().size_fast();
+            let number_of_moves = bit_board_state.gen_moves_legal().size();
             return number_of_moves;
         }
         else {
@@ -166,7 +166,7 @@ mod tests {
             return 0;
         }
         else if depth == 1 {
-            let number_of_moves = bit_board_state.gen_moves_legal().size_fast();
+            let number_of_moves = bit_board_state.gen_moves_legal().size();
             return number_of_moves;
         }
         else {

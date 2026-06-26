@@ -22,7 +22,7 @@ const BOT_NAME:&str = "sonkolbot";
 const TABLE_SIZE:usize = 10000000;
 const SEARCH_DEPTH:i64 = 10;
 const MAX_DEPTH:usize = 20;
-const MAX_TIME:Option<u128> = Some(15000);
+const MAX_TIME:Option<u128> = Some(3000);
 const STARTING_POS:&str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 /*
 game handler for a specific game

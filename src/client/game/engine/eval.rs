@@ -1,17 +1,17 @@
-use crate::client::game::engine::board;
+use crate::client::game::engine::board::{self, GameState};
 /**
  * eval contains all functions meant to statically evaluate a function, mainly trough the function "evaluate"
  * all static evaluation should remain stateless
  * 
  */
-use crate::client::game::engine::state_bitboard::{BISHOP, KNIGHT, PAWN, QUEEN, ROOK};
+use crate::client::game::engine::state_bitboard::{BISHOP, BoardStateNumbers, KNIGHT, PAWN, QUEEN, ROOK};
 
 use super::board::{ChessMove, BLACK_EN_PASSANT, B_CASTLE_KING, B_CASTLE_QUEEN, WHITE_EN_PASSANT, W_CASTLE_KING, W_CASTLE_QUEEN};
 use super::state_bitboard::bit_boards::{file_of, pop_lsb, rank_of, BOARD_CENTER, KING_PAWNS_OPTIMAL, NEIGHBOUR_FILES, RANKS, RANK_1, RANK_8, SEC_TIER_BISHOP, SEC_TIER_PAWN, TOP_TIER_BISHOP, TOP_TIER_PAWN};
 use super::state_bitboard::{bit_boards, BitBoardState, BLACK, KING, WHITE};
 
 
-fn is_check(bit_board_state:&BitBoardState, chess_move: &ChessMove) -> bool{
+pub fn is_check(bit_board_state:&BitBoardState, chess_move: &ChessMove) -> bool{
     /*
     summed up, if we give the moving side an extra tempo, can it capture the king?
      */
@@ -130,14 +130,13 @@ fn rook_score(rooks:u64, pawns:u64, _blockers:u64) -> i32{
 //a slightly less static way of counting material
 //knights are worth more in closed position
 //bishops are worth more in open positions
-//one rook is worth 500, two are 900
 fn dynamic_piece_count(pieces:&[u64; 6], other_pieces:&[u64; 6]) -> i32{
     let mut piece_count:i32 = 0;
 
     //default value for pieces
     const VALUE_PAWN:i32 = 100;
     const VALUE_KNIGHT:i32 = 300;
-    const VALUE_BISHOP:i32 = 340;
+    const VALUE_BISHOP:i32 = 320;
     const VALUES_ROOK:[i32; 10] = [500, 900, 1300, 1700, 2100, 2500, 2900, 3300, 3600, 3900];
     const VALUE_QUEEN:i32 = 900;
 
@@ -230,13 +229,13 @@ fn endgame_factor(pieces:&[[u64; 6]; 2]) -> i32{
  * PUBLIC FUNCTIONS
  */
 
-pub fn capture_score(bit_board_state:&mut BitBoardState, capture: &ChessMove) -> i32{
+pub fn capture_score(bit_board_state:&BitBoardState, capture: &ChessMove) -> i32{
     let origin_value = bit_board_state.piece_value(capture.origin()as usize).abs();
     let target_value = bit_board_state.piece_value(capture.target()as usize).abs();
-    return target_value - origin_value/10;
+    return target_value - origin_value;
 }
 
-pub fn is_capture(bit_board_state:&mut BitBoardState, m: &ChessMove) -> bool{
+pub fn is_capture(bit_board_state:&BitBoardState, m: &ChessMove) -> bool{
     match m.flag(){
         B_CASTLE_KING | B_CASTLE_QUEEN | W_CASTLE_KING | W_CASTLE_QUEEN => {return false;}//castle is never a capture
         WHITE_EN_PASSANT | BLACK_EN_PASSANT => {return true;}//en passant is allways a capture
@@ -261,6 +260,7 @@ pub fn promising_move(bit_board_state:&mut BitBoardState, chess_move: &mut Chess
     let color_value = if origin_value < 0 {-1} else {1};
 
 
+    // ! this turns what should have been a constant operation into a linear one, allthough n is usually quite small here
     if let Some(best_moves) = best_moves_option{
         for good_move in best_moves {
             if *chess_move == good_move.0 {
@@ -271,10 +271,6 @@ pub fn promising_move(bit_board_state:&mut BitBoardState, chess_move: &mut Chess
         }
     }
 
-    
-
-
-    //?I dont understand the unsused variable warnings here, TODO: fix later
     match chess_move.flag(){
         board::NO_FLAG => {
             if target_value != 0{ //is a capture
@@ -285,7 +281,7 @@ pub fn promising_move(bit_board_state:&mut BitBoardState, chess_move: &mut Chess
                 
                  */
                 promising_level += -target_value*10; //add value of captured piece
-                promising_level -= origin_value //subtract value/10 of capturing piece
+                promising_level -= origin_value*10 //subtract value of capturing piece
             }else{ // for non captures
 
                 if origin_value == 10{
@@ -343,6 +339,21 @@ pub fn promising_move(bit_board_state:&mut BitBoardState, chess_move: &mut Chess
     *promising_level_ref = promising_level as i16;
 }
 
+pub fn game_state(bit_board_state:&mut BitBoardState, match_history:&mut Vec<BoardStateNumbers>) -> GameState {
+
+    let game_state = bit_board_state.game_state();
+    if game_state != GameState::Playing {
+        return game_state;
+    }
+
+    let board_state_numbers = bit_board_state.board_state_numbers();
+    match_history.push(board_state_numbers);
+    if match_history.iter().filter(|&n| *n == board_state_numbers).count() == 3{
+        match_history.pop();
+        return GameState::Draw;
+    }
+    GameState::Playing
+}
 
 pub fn evaluate(bit_board_state:&BitBoardState) -> i32{
     let pieces = bit_board_state.piece_bb();
@@ -380,6 +391,7 @@ pub fn evaluate(bit_board_state:&BitBoardState) -> i32{
     eval += (rook_score(pieces[WHITE][ROOK], pieces[WHITE][PAWN], piece_mask) -
             rook_score(pieces[BLACK][ROOK], pieces[BLACK][PAWN], piece_mask)
             )*20;
+
     eval += (king_safety(&pieces[WHITE], &pieces[BLACK], WHITE) -
             king_safety(&pieces[BLACK], &pieces[WHITE], BLACK))
             *50;
